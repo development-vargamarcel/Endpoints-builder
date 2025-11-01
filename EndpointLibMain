@@ -1,7 +1,9 @@
 [Libraries]
 ENABLED=S
 NOME=Endpoint handling
-SCRIPT=' ===================================
+SCRIPT=' 
+' Important: the users of this library cannot use classes and cannot use custom types defined here. Also all names must be full qualified names. 
+===================================
 ' ENHANCED FLEXIBLE SQL WRAPPER SYSTEM
 ' Supports custom SQL, conditional expressions, and parameter-specific clauses
 ' ===================================
