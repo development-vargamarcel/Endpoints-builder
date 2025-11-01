@@ -84,7 +84,7 @@ Dim sensitiveFields = New String() {
     "BankAccount"
 }
 
-Dim logic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId", "Email"},
     sensitiveFields,  ' These fields NEVER appear in response
@@ -182,7 +182,7 @@ Else
     Dim defaultWhere = "1=1"
 End If
 
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     baseSQL,
     conditions,
     excludeFields,
@@ -257,7 +257,7 @@ whereConditions.Add("Status IN (:Status1, :Status2)")
 **Vulnerability:**
 ```vb
 ' ❌ User can update any field
-Dim logic = DB.Global.CreateBusinessLogicForWritingRows(
+Dim logic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
     New String() {"UserId", "Email", "Name", "IsAdmin", "Balance"},
     New String() {"UserId"},
@@ -291,7 +291,7 @@ Dim logic = DB.Global.CreateAdvancedBusinessLogicForWriting(
 **Vulnerability:**
 ```vb
 ' ❌ User can access any user's orders
-Dim logic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "Orders",
     New String() {"OrderId"},
     Nothing,
@@ -312,7 +312,7 @@ conditions.Add("OrderId", DB.Global.CreateParameterCondition(
     $"UserId = '{currentUserId}'"
 ))
 
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Orders {WHERE}",
     conditions,
     Nothing,
@@ -328,7 +328,7 @@ Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
 **Vulnerability:**
 ```vb
 ' ❌ Sensitive fields exposed
-Dim logic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId"},
     Nothing,  ' No excluded fields!
@@ -346,7 +346,7 @@ Dim excludeFields = New String() {
     "CreditCard", "CVV", "BankAccount"
 }
 
-Dim logic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId"},
     excludeFields,
@@ -361,7 +361,7 @@ Dim logic = DB.Global.CreateBusinessLogicForReadingRows(
 **Vulnerability:**
 ```vb
 ' ❌ User can update other users' data
-Dim logic = DB.Global.CreateBusinessLogicForWritingRows(
+Dim logic = DB.Global.CreateBusinessLogicForWriting(
     "UserProfiles",
     New String() {"UserId", "Bio"},
     New String() {"UserId"},

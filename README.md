@@ -38,7 +38,7 @@ A production-ready Visual Basic .NET library for building flexible, secure REST 
 
 ```vb
 ' Create a simple read endpoint
-Dim readLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
     "Users",                                    ' Table name
     New String() {"UserId", "Email", "Name"},  ' Searchable fields
     New String() {"Password"},                  ' Exclude fields
@@ -61,7 +61,7 @@ Return DB.Global.ProcessActionLink(
 
 ```vb
 ' Create a write endpoint with upsert capability
-Dim writeLogic = DB.Global.CreateBusinessLogicForWritingRows(
+Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",                                        ' Table name
     New String() {"UserId", "Email", "Name"},      ' All fields
     New String() {"UserId"},                       ' Key fields (required)
@@ -144,9 +144,9 @@ Function CreateValidatorForBatch(requiredArrayParams As String()) As Func(Of JOb
 ```
 Creates a validator for batch operations with required array parameters.
 
-#### CreateBusinessLogicForReadingRows
+#### CreateBusinessLogicForReading
 ```vb
-Function CreateBusinessLogicForReadingRows(
+Function CreateBusinessLogicForReading(
     tableName As String,
     AllParametersList As String(),
     excludeFields As String(),
@@ -155,9 +155,9 @@ Function CreateBusinessLogicForReadingRows(
 ```
 Creates standard read logic for a table.
 
-#### CreateBusinessLogicForWritingRows
+#### CreateBusinessLogicForWriting
 ```vb
-Function CreateBusinessLogicForWritingRows(
+Function CreateBusinessLogicForWriting(
     tableName As String,
     AllParametersList As String(),
     RequiredParametersList As String(),
@@ -166,9 +166,9 @@ Function CreateBusinessLogicForWritingRows(
 ```
 Creates standard write logic (insert/update) for a table.
 
-#### CreateBusinessLogicForWritingRowsBatch
+#### CreateBusinessLogicForWritingBatch
 ```vb
-Function CreateBusinessLogicForWritingRowsBatch(
+Function CreateBusinessLogicForWritingBatch(
     tableName As String,
     AllParametersList As String(),
     RequiredParametersList As String(),
@@ -177,9 +177,9 @@ Function CreateBusinessLogicForWritingRowsBatch(
 ```
 Creates batch write logic for multiple records.
 
-#### CreateAdvancedBusinessLogicForReading
+#### CreateBusinessLogicForReading
 ```vb
-Function CreateAdvancedBusinessLogicForReading(
+Function CreateBusinessLogicForReading(
     baseSQL As String,
     parameterConditions As Dictionary(Of String, Object),
     Optional excludeFields As String() = Nothing,

@@ -53,7 +53,7 @@ DB.Global.ClearPropertyCache()
 ```vb
 ' BEST PRACTICE - Explicit field selection
 Dim baseSQL = "SELECT UserId, Email, Name, CreatedDate FROM Users {WHERE}"
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     baseSQL,
     parameterConditions,
     Nothing,  ' No excludeFields needed!
@@ -63,7 +63,7 @@ Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
 ' LEGACY APPROACH - SELECT * with exclusion (backward compatibility)
 Dim baseSQL = "SELECT * FROM Users {WHERE}"
 Dim excludeFields = New String() {"Password", "SSN"}
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     baseSQL,
     parameterConditions,
     excludeFields,  ' Field exclusion still works but not recommended
@@ -235,11 +235,11 @@ All optimizations are **100% backward compatible**:
 1. **Use Batch Operations for Multiple Records**
    ```vb
    ' Good: Batch 100 records
-   Dim batchLogic = DB.Global.CreateBusinessLogicForWritingRowsBatch(...)
+   Dim batchLogic = DB.Global.CreateBusinessLogicForWritingBatch(...)
 
    ' Bad: 100 individual operations
    For Each record In records
-       Dim writeLogic = DB.Global.CreateBusinessLogicForWritingRows(...)
+       Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(...)
    Next
    ```
 

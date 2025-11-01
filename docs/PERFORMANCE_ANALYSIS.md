@@ -148,7 +148,7 @@ For backward compatibility, field exclusion is still supported with HashSet opti
 **Migration Example**:
 ```vb
 ' Before (legacy):
-Dim readLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId", "Email"},
     New String() {"Password"},  ' Excluded fields
@@ -160,7 +160,7 @@ Dim conditions As New Dictionary(Of String, Object)
 conditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId"))
 conditions.Add("Email", DB.Global.CreateParameterCondition("Email", "Email LIKE :Email"))
 
-Dim readLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT UserId, Email, Name, CreatedDate FROM Users {WHERE}",  ' Explicit fields
     conditions,
     Nothing,  ' No exclusion needed
