@@ -15,7 +15,7 @@ If PayloadError IsNot Nothing Then
     Return PayloadError
 End If
 
-Dim secureLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim secureLogic = DB.Global.CreateBusinessLogicForReading(
     "SensitiveData",
     New String() {"RecordId", "UserId"},
     New String() {"SSN", "CreditCard", "Password"},  ' Always exclude sensitive fields
@@ -67,7 +67,7 @@ Dim sensitiveFields = New String() {
     "RefreshToken"
 }
 
-Dim profileLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim profileLogic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId", "Email", "Phone"},
     sensitiveFields,  ' Excluded from response
@@ -93,7 +93,7 @@ If PayloadError3 IsNot Nothing Then
 End If
 
 ' This is SAFE - uses parameterized query
-Dim safeLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim safeLogic = DB.Global.CreateBusinessLogicForReading(
     "Products",
     New String() {"ProductName", "Category"},
     Nothing,
@@ -139,7 +139,7 @@ If actionResult.Item1 Then
     End If
 End If
 
-Dim logic4 = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic4 = DB.Global.CreateBusinessLogicForReading(
     "AuditLog",
     New String() {"UserId", "Action"},
     Nothing,
@@ -200,7 +200,7 @@ roleConditions.Add("Status", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim roleBasedLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim roleBasedLogic = DB.Global.CreateBusinessLogicForReading(
     "Orders SELECT * FROM Orders {WHERE} ORDER BY OrderDate DESC",
     roleConditions,
     Nothing,
@@ -241,7 +241,7 @@ Dim logMessage = $"API Request from User: {userIdResult6.Item2} at {DateTime.Now
 DB.Global.LogCustom(DB, StringPayload6, "Request received", logMessage)
 
 ' Process the request
-Dim logic6 = DB.Global.CreateBusinessLogicForReadingRows(
+Dim logic6 = DB.Global.CreateBusinessLogicForReading(
     "Products",
     New String() {"Category"},
     Nothing,
@@ -290,7 +290,7 @@ End If
 
 ' Proceed with update
 Dim updateableFields = New String() {"UserId", "Email", "Phone", "Address"}
-Dim updateLogic = DB.Global.CreateBusinessLogicForWritingRows(
+Dim updateLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
     updateableFields,
     New String() {"UserId"},
@@ -389,7 +389,7 @@ If recordsResult.Item1 Then
 End If
 
 ' Proceed with batch operation
-Dim batchLogic9 = DB.Global.CreateBusinessLogicForWritingRowsBatch(
+Dim batchLogic9 = DB.Global.CreateBusinessLogicForWritingBatch(
     "UserNotes",
     New String() {"NoteId", "UserId", "Title", "Content"},
     New String() {"NoteId"},
@@ -473,7 +473,7 @@ Else
 End If
 
 ' 9. ✓ Create secure business logic
-Dim secureLogic10 = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim secureLogic10 = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM RESOURCES {WHERE} ORDER BY CREATED_DATE DESC",
     securityConditions,
     excludeFields,

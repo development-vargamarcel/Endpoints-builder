@@ -189,7 +189,7 @@ searchConditions.Add("USER_ID", DB.Global.CreateParameterCondition("userId", "US
 searchConditions.Add("EMAIL_ADDRESS", DB.Global.CreateParameterCondition("email", "EMAIL_ADDRESS LIKE :EMAIL_ADDRESS", Nothing))
 searchConditions.Add("DEPT_CODE", DB.Global.CreateParameterCondition("department", "DEPT_CODE = :DEPT_CODE", Nothing))
 
-Dim reader4 = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim reader4 = DB.Global.CreateBusinessLogicForReading(
     "SELECT USER_ID, EMAIL_ADDRESS, FIRST_NAME, LAST_NAME, DEPT_CODE FROM USERS_TABLE {WHERE}",
     searchConditions,
     Nothing,

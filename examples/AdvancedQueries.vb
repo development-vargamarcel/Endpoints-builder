@@ -36,7 +36,7 @@ dateConditions.Add("Status", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim dateRangeLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim dateRangeLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Orders {WHERE} ORDER BY CreatedDate DESC",
     dateConditions,
     Nothing,
@@ -97,7 +97,7 @@ priceConditions.Add("Category", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim priceRangeLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim priceRangeLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT ProductId, Name, Price, Quantity, Category FROM Products {WHERE} ORDER BY Price ASC",
     priceConditions,
     Nothing,
@@ -148,7 +148,7 @@ activeConditions.Add("Name", DB.Global.CreateParameterCondition(
 ' Default WHERE clause applied when no parameters provided
 Dim defaultWhereClause = "IsActive = 1 AND Quantity > 0"
 
-Dim activeProductsLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim activeProductsLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Products {WHERE}",
     activeConditions,
     Nothing,
@@ -205,7 +205,7 @@ complexConditions.Add("AssignedTo", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim complexLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim complexLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Tickets {WHERE} ORDER BY Priority DESC, CreatedDate DESC",
     complexConditions,
     Nothing,
@@ -255,7 +255,7 @@ inConditions.Add("Department", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim inLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim inLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Tasks {WHERE} ORDER BY DueDate ASC",
     inConditions,
     Nothing,
@@ -309,7 +309,7 @@ aggregateConditions.Add("Category", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim aggregateLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim aggregateLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT " &
     "Category, " &
     "COUNT(*) as OrderCount, " &
@@ -366,7 +366,7 @@ subqueryConditions.Add("minTotal", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim subqueryLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim subqueryLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT " &
     "c.CustomerId, " &
     "c.Name, " &
@@ -426,7 +426,7 @@ searchConditions.Add("Category", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim fullTextLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim fullTextLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT ArticleId, Title, Description, Category, Tags, PublishedDate " &
     "FROM Articles {WHERE} " &
     "ORDER BY PublishedDate DESC",
@@ -476,7 +476,7 @@ paginationConditions.Add("Status", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim paginatedLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim paginatedLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT TOP 50 * FROM Orders {WHERE} ORDER BY OrderDate DESC",  ' Latest 50 orders
     paginationConditions,
     Nothing,
@@ -526,7 +526,7 @@ sortConditions.Add("minPrice", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim sortedLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim sortedLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Products {WHERE} " &
     "ORDER BY " &
     "CASE WHEN Price < 10 THEN 1 WHEN Price < 100 THEN 2 ELSE 3 END, " &  ' Price tier
