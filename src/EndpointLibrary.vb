@@ -1,11 +1,11 @@
 [Libraries]
 ENABLED=S
 NOME=Endpoint handling
-SCRIPT=' 
-' Important: the users of this library cannot use classes and cannot use custom types defined here. Also all names must be full qualified names. 
+SCRIPT='
+' Important: the users of this library cannot use classes and cannot use custom types defined here. Also all names must be full qualified names.
 ===================================
-' ENHANCED FLEXIBLE SQL WRAPPER SYSTEM
-' Supports custom SQL, conditional expressions, and parameter-specific clauses
+' FLEXIBLE SQL WRAPPER SYSTEM
+' High-performance endpoint library with optimized batch operations
 ' ===================================
 
 ' ===================================
@@ -18,7 +18,7 @@ Public Class ParameterCondition
     Public Property SQLWhenAbsent As String       ' SQL clause when parameter absent (e.g., "1=1" or Nothing)
     Public Property UseParameter As Boolean       ' Whether to bind parameter value (True) or use literal (False)
     Public Property DefaultValue As Object        ' Default value if not provided
-    
+
     Public Sub New(paramName As String, sqlWhenPresent As String, Optional sqlWhenAbsent As String = Nothing, Optional useParameter As Boolean = True, Optional defaultValue As Object = Nothing)
         Me.ParameterName = paramName
         Me.SQLWhenPresent = sqlWhenPresent
@@ -27,7 +27,6 @@ Public Class ParameterCondition
         Me.DefaultValue = defaultValue
     End Sub
 End Class
-
 
 ' ===================================
 ' FIELD MAPPING CLASS
@@ -38,7 +37,7 @@ Public Class FieldMapping
     Public Property SqlColumn As String
     Public Property IsRequired As Boolean
     Public Property DefaultValue As Object
-    
+
     Public Sub New(jsonProp As String, sqlCol As String, Optional isRequired As Boolean = False, Optional defaultVal As Object = Nothing)
         Me.JsonProperty = jsonProp
         Me.SqlColumn = sqlCol
@@ -48,11 +47,8 @@ Public Class FieldMapping
 End Class
 
 ' ===================================
-' HELPER CLASSES FOR FACTORY FUNCTIONS
+' PERFORMANCE: PROPERTY NAME CACHING
 ' ===================================
-
-' PERFORMANCE: Cache for case-insensitive property name lookups
-' Reduces O(n) property iteration to O(1) dictionary lookup
 Private Shared _propertyNameCache As New System.Collections.Concurrent.ConcurrentDictionary(Of Integer, System.Collections.Generic.Dictionary(Of String, String))
 Private Shared _cacheHitCount As Integer = 0
 Private Shared _cacheMissCount As Integer = 0
@@ -129,6 +125,10 @@ Public Shared Sub ClearPropertyCache()
     _cacheMissCount = 0
 End Sub
 
+' ===================================
+' VALIDATORS
+' ===================================
+
 Public Class ValidatorWrapper
     Private ReadOnly _requiredParams As String()
 
@@ -157,15 +157,15 @@ Public Class ValidatorForBatchWrapper
     Public Function Validate(payload As Newtonsoft.Json.Linq.JObject) As String
         For Each paramName As String In _requiredArrayParams
             Dim token = GetPropertyCaseInsensitive(payload, paramName)
-            
+
             If token Is Nothing Then
                 Return CreateErrorResponse($"Parameter {paramName} not specified")
             End If
-            
+
             If token.Type <> Newtonsoft.Json.Linq.JTokenType.Array Then
                 Return CreateErrorResponse($"Parameter {paramName} must be an array")
             End If
-            
+
             Dim paramResult = GetArrayParameter(payload, paramName)
             If Not paramResult.Item1 Then
                 Return CreateErrorResponse($"Parameter {paramName} is not a valid array")
@@ -176,66 +176,61 @@ Public Class ValidatorForBatchWrapper
 End Class
 
 ' ===================================
-' ENHANCED BUSINESS LOGIC READER
-' Supports custom SQL and parameter-specific conditions
+' BUSINESS LOGIC: READER
 ' ===================================
-Public Class BusinessLogicAdvancedReaderWrapper
+Public Class BusinessLogicReaderWrapper
     Private ReadOnly _baseSQL As String
     Private ReadOnly _parameterConditions As System.Collections.Generic.Dictionary(Of String, Object)
-    Private ReadOnly _excludeFields As String()
     Private ReadOnly _defaultWhereClause As String
     Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping)
-    
+
     ''' <summary>
-    ''' Advanced reader with full SQL customization
+    ''' Reader with full SQL customization. Use explicit SELECT fields (not SELECT *)
     ''' </summary>
-    ''' <param name="baseSQL">Base SQL query (can include {WHERE} placeholder)</param>
+    ''' <param name="baseSQL">Base SQL query with explicit fields (e.g., SELECT UserId, Email FROM Users {WHERE})</param>
     ''' <param name="parameterConditions">Dictionary of parameter-specific SQL conditions</param>
-    ''' <param name="excludeFields">Fields to exclude from results</param>
     ''' <param name="defaultWhereClause">Default WHERE clause if no parameters provided</param>
     ''' <param name="fieldMappings">Optional JSON-to-SQL field mappings</param>
     Public Sub New(baseSQL As String, _
                    parameterConditions As System.Collections.Generic.Dictionary(Of String, Object), _
-                   Optional excludeFields As String() = Nothing, _
                    Optional defaultWhereClause As String = Nothing, _
                    Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing)
         _baseSQL = baseSQL
         _parameterConditions = If(parameterConditions, New System.Collections.Generic.Dictionary(Of String, Object))
-        _excludeFields = excludeFields
         _defaultWhereClause = defaultWhereClause
         _fieldMappings = fieldMappings
     End Sub
-    
+
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
         Try
             Dim whereConditions As New System.Collections.Generic.List(Of String)
             Dim sqlParameters As New System.Collections.Generic.Dictionary(Of String, Object)
             Dim providedParams As New System.Collections.Generic.List(Of String)
-            
+
             ' Process each parameter condition
             For Each kvp As System.Collections.Generic.KeyValuePair(Of String, Object) In _parameterConditions
                 Dim condition As ParameterCondition = kvp.Value
                 Dim paramName As String = condition.ParameterName
-                
+
                 ' Check if parameter exists in payload (case-insensitive)
                 Dim paramResult = GetObjectParameter(payload, paramName)
-                
+
                 If paramResult.Item1 Then
                     ' Parameter is present - use SQLWhenPresent
                     providedParams.Add(paramName)
-                    
+
                     If Not String.IsNullOrEmpty(condition.SQLWhenPresent) Then
                         whereConditions.Add(condition.SQLWhenPresent)
-                        
+
                         ' Add parameter binding if UseParameter is True
                         If condition.UseParameter Then
                             Dim sqlColName As String = paramName
-                            
+
                             ' Use field mapping if available
                             If _fieldMappings IsNot Nothing AndAlso _fieldMappings.ContainsKey(paramName) Then
                                 sqlColName = _fieldMappings(paramName).SqlColumn
                             End If
-                            
+
                             sqlParameters.Add(sqlColName, paramResult.Item2)
                         End If
                     End If
@@ -244,7 +239,7 @@ Public Class BusinessLogicAdvancedReaderWrapper
                     If Not String.IsNullOrEmpty(condition.SQLWhenAbsent) Then
                         whereConditions.Add(condition.SQLWhenAbsent)
                     End If
-                    
+
                     ' Use default value if specified
                     If condition.DefaultValue IsNot Nothing AndAlso condition.UseParameter Then
                         Dim sqlColName As String = paramName
@@ -302,8 +297,8 @@ Public Class BusinessLogicAdvancedReaderWrapper
             End If
 
             ' Execute query
-            Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters, _excludeFields)
-            
+            Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
+
             Return New With {
                 .Result = "OK",
                 .ProvidedParameters = String.Join(",", providedParams),
@@ -319,65 +314,9 @@ Public Class BusinessLogicAdvancedReaderWrapper
 End Class
 
 ' ===================================
-' STANDARD BUSINESS LOGIC READER (Backward Compatible)
+' BUSINESS LOGIC: WRITER
 ' ===================================
-Public Class BusinessLogicReaderWrapper
-    Private ReadOnly _tableName As String
-    Private ReadOnly _AllParametersList As String()
-    Private ReadOnly _excludeFields As String()
-    Private ReadOnly _useLikeOperator As Boolean
-
-    Public Sub New(tableName As String, AllParametersList As String(), excludeFields As String(), Optional useLikeOperator As Boolean = True)
-        _tableName = tableName
-        _AllParametersList = AllParametersList
-        _excludeFields = excludeFields
-        _useLikeOperator = useLikeOperator
-    End Sub
-
-    Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
-        Try
-            Dim parameters = getParameters(payload, _AllParametersList)
-
-            ' PERFORMANCE: Use StringBuilder for efficient SQL construction
-            Dim sqlBuilder As New System.Text.StringBuilder(256)
-            sqlBuilder.Append("SELECT * FROM ")
-            sqlBuilder.Append(_tableName)
-
-            Dim whereConditions As New System.Collections.Generic.List(Of String)(parameters.Count)
-            For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
-                If _useLikeOperator Then
-                    whereConditions.Add($"{param.Key} LIKE :{param.Key}")
-                Else
-                    whereConditions.Add($"{param.Key} = :{param.Key}")
-                End If
-            Next
-
-            If whereConditions.Count > 0 Then
-                sqlBuilder.Append(" WHERE ")
-                sqlBuilder.Append(String.Join(" AND ", whereConditions))
-            End If
-
-            Dim sql As String = sqlBuilder.ToString()
-            Dim rows = ExecuteQueryToDictionary(database, sql, parameters, _excludeFields)
-
-            Return New With {
-                .Result = "OK",
-                .ColumnsYouCanFilterBy = String.Join(",", _AllParametersList),
-                .Records = rows
-            }
-        Catch ex As Exception
-            Return Newtonsoft.Json.JsonConvert.DeserializeObject(
-                CreateErrorResponse($"Error reading records: {ex.Message}")
-            )
-        End Try
-    End Function
-End Class
-
-' ===================================
-' ENHANCED BUSINESS LOGIC WRITER
-' Supports custom SQL for existence checks and updates
-' ===================================
-Public Class BusinessLogicAdvancedWriterWrapper
+Public Class BusinessLogicWriterWrapper
     Private ReadOnly _tableName As String
     Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping)
     Private ReadOnly _keyFields As String()
@@ -385,9 +324,9 @@ Public Class BusinessLogicAdvancedWriterWrapper
     Private ReadOnly _customExistenceCheckSQL As String
     Private ReadOnly _customUpdateSQL As String
     Private ReadOnly _customWhereClause As String
-    
+
     ''' <summary>
-    ''' Advanced writer with custom SQL support
+    ''' Writer with custom SQL support
     ''' </summary>
     ''' <param name="tableName">Table name for operations</param>
     ''' <param name="fieldMappings">Dictionary of field mappings (JSON to SQL)</param>
@@ -411,7 +350,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
         _customUpdateSQL = customUpdateSQL
         _customWhereClause = customWhereClause
     End Sub
-    
+
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
         Try
             ' Validate required fields
@@ -424,11 +363,11 @@ Public Class BusinessLogicAdvancedWriterWrapper
                     End If
                 End If
             Next
-            
+
             If missingRequired.Count > 0 Then
                 Return New With {.Result = "KO", .Reason = $"Missing required fields: {String.Join(", ", missingRequired)}"}
             End If
-            
+
             ' Get parameters with field mapping
             Dim parameters As New System.Collections.Generic.Dictionary(Of String, Object)
             For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In _fieldMappings
@@ -439,11 +378,11 @@ Public Class BusinessLogicAdvancedWriterWrapper
                     parameters.Add(kvp.Value.SqlColumn, kvp.Value.DefaultValue)
                 End If
             Next
-            
+
             ' Check existence
             Dim recordExists As Boolean = False
             Dim existenceSQL As String
-            
+
             If Not String.IsNullOrEmpty(_customExistenceCheckSQL) Then
                 existenceSQL = _customExistenceCheckSQL
             Else
@@ -454,7 +393,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
                 Next
                 existenceSQL = $"SELECT COUNT(*) as CNT FROM {_tableName} WHERE {String.Join(" AND ", whereConditions)}"
             End If
-            
+
             Dim checkQuery As New QWTable()
             Try
                 checkQuery.Database = database
@@ -473,12 +412,12 @@ Public Class BusinessLogicAdvancedWriterWrapper
                     checkQuery.Dispose()
                 End If
             End Try
-            
+
             If recordExists Then
                 If Not _allowUpdates Then
                     Return New With {.Result = "KO", .Reason = "Record already exists and updates are not allowed"}
                 End If
-                
+
                 ' Perform UPDATE
                 If Not String.IsNullOrEmpty(_customUpdateSQL) Then
                     ' Use custom UPDATE SQL
@@ -502,7 +441,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
                             setClauses.Add($"{kvp.Key} = :{kvp.Key}")
                         End If
                     Next
-                    
+
                     If setClauses.Count > 0 Then
                         Dim whereClause As String
                         If Not String.IsNullOrEmpty(_customWhereClause) Then
@@ -514,7 +453,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
                             Next
                             whereClause = String.Join(" AND ", whereConditions)
                         End If
-                        
+
                         Dim updateQuery As New QWTable()
                         Try
                             updateQuery.Database = database
@@ -529,7 +468,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
                         End Try
                     End If
                 End If
-                
+
                 Return New With {.Result = "OK", .Action = "UPDATED", .Message = "Record updated successfully"}
             Else
                 ' Perform INSERT
@@ -540,7 +479,7 @@ Public Class BusinessLogicAdvancedWriterWrapper
                     qTable.RequestLive = True
                     qTable.AllowAllRecords = False
                     qTable.Active = True
-                    
+
                     qTable.BeginAppend()
                     For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
                         Try
@@ -549,156 +488,18 @@ Public Class BusinessLogicAdvancedWriterWrapper
                             ' Field might not exist
                         End Try
                     Next
-                    
+
                     Dim saveMsg As String = ""
                     Dim okSave As Boolean = qTable.SaveRecord(saveMsg)
                     qTable.Active = False
-                    
+
                     If Not okSave Then
                         Return New With {.Result = "KO", .Reason = $"Error saving record: {saveMsg}"}
                     End If
-                    
+
                     Return New With {.Result = "OK", .Action = "INSERTED", .Message = "Record inserted successfully"}
                 Finally
                     If qTable IsNot Nothing Then qTable.Dispose()
-                End Try
-            End If
-        Catch ex As Exception
-            Return New With {.Result = "KO", .Reason = $"Database operation failed: {ex.Message}"}
-        End Try
-    End Function
-End Class
-
-' ===================================
-' STANDARD BUSINESS LOGIC WRITER (Backward Compatible)
-' ===================================
-Public Class BusinessLogicWriterWrapper
-    Private ReadOnly _tableName As String
-    Private ReadOnly _AllParametersList As String()
-    Private ReadOnly _RequiredParametersList As String()
-    Private ReadOnly _allowUpdates As Boolean
-
-    Public Sub New(tableName As String, AllParametersList As String(), RequiredParametersList As String(), allowUpdates As Boolean)
-        _tableName = tableName
-        _AllParametersList = AllParametersList
-        _RequiredParametersList = RequiredParametersList
-        _allowUpdates = allowUpdates
-    End Sub
-
-    Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
-        Try
-            For Each paramName As String In _RequiredParametersList
-                Dim paramResult = GetObjectParameter(payload, paramName)
-                If Not paramResult.Item1 Then
-                    Return New With {.Result = "KO", .Reason = $"Required parameter '{paramName}' is missing"}
-                End If
-            Next
-
-            Dim parameters = getParameters(payload, _AllParametersList)
-            
-            Dim whereConditions As New System.Collections.Generic.List(Of String)
-            Dim keyValuesList As New System.Collections.Generic.List(Of String)
-            For Each keyCol As String In _RequiredParametersList
-                whereConditions.Add($"{keyCol} = :{keyCol}")
-                keyValuesList.Add(If(parameters.ContainsKey(keyCol), parameters(keyCol).ToString(), String.Empty))
-            Next
-            Dim IndexColumnsValues As String = String.Join(",", keyValuesList)
-            
-            Dim checkQuery As New QWTable()
-            Dim recordExists As Boolean
-            Try
-                checkQuery.Database = database
-                checkQuery.SQL = $"SELECT COUNT(*) as CNT FROM {_tableName} WHERE {String.Join(" AND ", whereConditions)}"
-                For Each keyCol As String In _RequiredParametersList
-                    If parameters.ContainsKey(keyCol) Then
-                        checkQuery.params(keyCol) = parameters(keyCol)
-                    End If
-                Next
-                checkQuery.RequestLive = False
-                checkQuery.Active = True
-                recordExists = (CInt(checkQuery.Rowset.Fields("CNT").Value) > 0)
-            Finally
-                If checkQuery IsNot Nothing Then
-                    checkQuery.Active = False
-                    checkQuery.Dispose()
-                End If
-            End Try
-            
-            If recordExists Then
-                If Not _allowUpdates Then
-                    Return New With {.Result = "KO", .Reason = $"{IndexColumnsValues} - Record already exists and updates are not allowed"}
-                End If
-
-                Dim setClauses As New System.Collections.Generic.List(Of String)
-                Dim updateColumns = _AllParametersList.Except(_RequiredParametersList)
-
-                For Each colName As String In updateColumns
-                    If parameters.ContainsKey(colName) Then
-                        setClauses.Add($"{colName} = :{colName}")
-                    End If
-                Next
-
-                If setClauses.Count > 0 Then
-                    Dim updateQuery As New QWTable()
-                    Try
-                        updateQuery.Database = database
-                        updateQuery.SQL = $"UPDATE {_tableName} SET {String.Join(", ", setClauses)} WHERE {String.Join(" AND ", whereConditions)}"
-                        
-                        For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
-                            updateQuery.params(param.Key) = param.Value
-                        Next
-                        
-                        updateQuery.Active = True
-                        updateQuery.Active = False
-                    Catch ex As Exception
-                        Return New With {.Result = "KO", .Reason = $"{IndexColumnsValues} - Update error: {ex.Message}"}
-                    Finally
-                        If updateQuery IsNot Nothing Then updateQuery.Dispose()
-                    End Try
-                End If
-                
-                Return New With {
-                    .Result = "OK",
-                    .RequiredColumns = String.Join(",", _RequiredParametersList),
-                    .Action = "UPDATED",
-                    .Message = "Record updated successfully"
-                }
-            Else
-                Dim qTable As New QWTable()
-                Try
-                    qTable.Database = database
-                    qTable.SQL = $"SELECT * FROM {_tableName} WHERE 1=0"
-                    qTable.RequestLive = True
-                    qTable.AllowAllRecords = False
-                    qTable.Active = True
-                    
-                    qTable.BeginAppend()
-                    For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
-                        Try
-                            qTable.Replace(param.Key, param.Value)
-                        Catch ex As Exception
-                        End Try
-                    Next
-                    
-                    Dim saveMsg As String = ""
-                    Dim okSave As Boolean = qTable.SaveRecord(saveMsg)
-                    
-                    qTable.Active = False
-                    
-                    If Not okSave Then
-                        Return New With {.Result = "KO", .Reason = $"{IndexColumnsValues} - Error saving record: {saveMsg}"}
-                    End If
-
-                    Return New With {
-                        .Result = "OK",
-                        .RequiredColumns = String.Join(",", _RequiredParametersList),
-                        .Action = "INSERTED",
-                        .Message = "Record inserted successfully"
-                    }
-                Finally
-                    If qTable IsNot Nothing Then
-                        qTable.Dispose()
-                    End If
                 End Try
             End If
         Catch ex As Exception
@@ -825,18 +626,18 @@ Private Shared Function GetCompositeKey(recordParams As System.Collections.Gener
 End Function
 
 ' ===================================
-' BATCH WRITER (Backward Compatible)
+' BUSINESS LOGIC: BATCH WRITER
 ' ===================================
 Public Class BusinessLogicBatchWriterWrapper
     Private ReadOnly _tableName As String
-    Private ReadOnly _AllParametersList As String()
-    Private ReadOnly _RequiredParametersList As String()
+    Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping)
+    Private ReadOnly _keyFields As String()
     Private ReadOnly _allowUpdates As Boolean
 
-    Public Sub New(tableName As String, AllParametersList As String(), RequiredParametersList As String(), allowUpdates As Boolean)
+    Public Sub New(tableName As String, fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping), keyFields As String(), allowUpdates As Boolean)
         _tableName = tableName
-        _AllParametersList = AllParametersList
-        _RequiredParametersList = RequiredParametersList
+        _fieldMappings = fieldMappings
+        _keyFields = keyFields
         _allowUpdates = allowUpdates
     End Sub
 
@@ -846,7 +647,8 @@ Public Class BusinessLogicBatchWriterWrapper
             Dim recordsArray As Newtonsoft.Json.Linq.JArray = TryCast(recordsToken, Newtonsoft.Json.Linq.JArray)
 
             If recordsArray Is Nothing Then
-                Dim singleRecordHandler As New BusinessLogicWriterWrapper(_tableName, _AllParametersList, _RequiredParametersList, _allowUpdates)
+                ' Single record - use standard writer
+                Dim singleRecordHandler As New BusinessLogicWriterWrapper(_tableName, _fieldMappings, _keyFields, _allowUpdates)
                 Return singleRecordHandler.Execute(database, payload)
             End If
 
@@ -858,27 +660,40 @@ Public Class BusinessLogicBatchWriterWrapper
             Dim allRecordParams As New System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))(recordsArray.Count)
             Dim recordDataList As New System.Collections.Generic.List(Of Object)(recordsArray.Count)
 
-            ' First pass: Extract parameters and validate required fields
+            ' First pass: Extract and validate parameters
             For Each recordToken As Newtonsoft.Json.Linq.JToken In recordsArray
                 Try
                     Dim record As Newtonsoft.Json.Linq.JObject = CType(recordToken, Newtonsoft.Json.Linq.JObject)
 
-                    Dim missingParams As New System.Collections.Generic.List(Of String)
-                    For Each paramName As String In _RequiredParametersList
-                        Dim paramResult = GetObjectParameter(record, paramName)
-                        If Not paramResult.Item1 Then
-                            missingParams.Add(paramName)
+                    ' Validate required fields
+                    Dim missingRequired As New System.Collections.Generic.List(Of String)
+                    For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In _fieldMappings
+                        If kvp.Value.IsRequired Then
+                            Dim paramResult = GetObjectParameter(record, kvp.Key)
+                            If Not paramResult.Item1 Then
+                                missingRequired.Add(kvp.Key)
+                            End If
                         End If
                     Next
 
-                    If missingParams.Count > 0 Then
-                        errors.Add($"Record skipped - Missing required parameters: {String.Join(", ", missingParams)}")
+                    If missingRequired.Count > 0 Then
+                        errors.Add($"Record skipped - Missing required fields: {String.Join(", ", missingRequired)}")
                         errorCount += 1
-                        recordDataList.Add(Nothing) ' Placeholder for skipped record
+                        recordDataList.Add(Nothing)
                         Continue For
                     End If
 
-                    Dim recordParams = getParameters(record, _AllParametersList)
+                    ' Extract parameters with field mappings
+                    Dim recordParams As New System.Collections.Generic.Dictionary(Of String, Object)
+                    For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In _fieldMappings
+                        Dim paramResult = GetObjectParameter(record, kvp.Key)
+                        If paramResult.Item1 Then
+                            recordParams.Add(kvp.Value.SqlColumn, paramResult.Item2)
+                        ElseIf kvp.Value.DefaultValue IsNot Nothing Then
+                            recordParams.Add(kvp.Value.SqlColumn, kvp.Value.DefaultValue)
+                        End If
+                    Next
+
                     allRecordParams.Add(recordParams)
                     recordDataList.Add(recordParams)
 
@@ -892,7 +707,7 @@ Public Class BusinessLogicBatchWriterWrapper
             ' PERFORMANCE: Single bulk existence check for all valid records
             Dim existingRecords As System.Collections.Generic.HashSet(Of String) = Nothing
             If allRecordParams.Count > 0 Then
-                existingRecords = BulkExistenceCheck(database, _tableName, _RequiredParametersList, allRecordParams)
+                existingRecords = BulkExistenceCheck(database, _tableName, _keyFields, allRecordParams)
             Else
                 existingRecords = New System.Collections.Generic.HashSet(Of String)()
             End If
@@ -906,17 +721,17 @@ Public Class BusinessLogicBatchWriterWrapper
 
                 Try
                     ' Get composite key for this record
-                    Dim compositeKey As String = GetCompositeKey(recordParams, _RequiredParametersList)
+                    Dim compositeKey As String = GetCompositeKey(recordParams, _keyFields)
                     Dim recordExists As Boolean = existingRecords.Contains(compositeKey)
 
                     Dim keyValuesList As New System.Collections.Generic.List(Of String)
-                    For Each keyCol As String In _RequiredParametersList
+                    For Each keyCol As String In _keyFields
                         keyValuesList.Add(If(recordParams.ContainsKey(keyCol), recordParams(keyCol).ToString(), String.Empty))
                     Next
                     Dim IndexColumnsValues As String = String.Join(",", keyValuesList)
 
                     If recordExists Then
-                        ' PERFORMANCE: Record existence already determined via bulk check
+                        ' Record exists - perform UPDATE
                         If Not _allowUpdates Then
                             errors.Add($"{IndexColumnsValues} - Record already exists and updates are not allowed")
                             errorCount += 1
@@ -924,16 +739,14 @@ Public Class BusinessLogicBatchWriterWrapper
                         End If
 
                         Dim whereConditions As New System.Collections.Generic.List(Of String)
-                        For Each keyCol As String In _RequiredParametersList
+                        For Each keyCol As String In _keyFields
                             whereConditions.Add($"{keyCol} = :{keyCol}")
                         Next
 
                         Dim setClauses As New System.Collections.Generic.List(Of String)
-                        Dim updateColumns = _AllParametersList.Except(_RequiredParametersList)
-
-                        For Each colName As String In updateColumns
-                            If recordParams.ContainsKey(colName) Then
-                                setClauses.Add($"{colName} = :{colName}")
+                        For Each kvp As System.Collections.Generic.KeyValuePair(Of String, Object) In recordParams
+                            If Not _keyFields.Contains(kvp.Key) Then
+                                setClauses.Add($"{kvp.Key} = :{kvp.Key}")
                             End If
                         Next
 
@@ -942,11 +755,11 @@ Public Class BusinessLogicBatchWriterWrapper
                             Try
                                 updateQuery.Database = database
                                 updateQuery.SQL = $"SET DATEFORMAT ymd;UPDATE {_tableName} SET {String.Join(", ", setClauses)} WHERE {String.Join(" AND ", whereConditions)}"
-                                
+
                                 For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In recordParams
                                     updateQuery.params(param.Key) = param.Value
                                 Next
-                                
+
                                 updateQuery.Active = True
                                 updateQuery.Active = False
                                 updatedCount += 1
@@ -960,6 +773,7 @@ Public Class BusinessLogicBatchWriterWrapper
                             updatedCount += 1
                         End If
                     Else
+                        ' Record does not exist - perform INSERT
                         Dim insertTable As New QWTable()
                         Try
                             insertTable.Database = database
@@ -967,7 +781,7 @@ Public Class BusinessLogicBatchWriterWrapper
                             insertTable.RequestLive = True
                             insertTable.AllowAllRecords = False
                             insertTable.Active = True
-                            
+
                             insertTable.BeginAppend()
                             For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In recordParams
                                 Try
@@ -975,7 +789,7 @@ Public Class BusinessLogicBatchWriterWrapper
                                 Catch ex As Exception
                                 End Try
                             Next
-                            
+
                             Dim saveMsg As String = ""
                             If insertTable.SaveRecord(saveMsg) Then
                                 insertedCount += 1
@@ -999,11 +813,9 @@ Public Class BusinessLogicBatchWriterWrapper
                     errorCount += 1
                 End Try
             Next
-            
+
             Return New With {
                 .Result = If(errorCount = 0, "OK", IIf(errorCount >= recordsArray.Count, "KO", "PARTIAL")),
-                .ColumnsYouCanWriteTo = String.Join(",", _AllParametersList),
-                .RequiredColumns = String.Join(",", _RequiredParametersList),
                 .Inserted = insertedCount,
                 .Updated = updatedCount,
                 .Errors = errorCount,
@@ -1038,7 +850,7 @@ Public Function ProcessActionLink(
         If payload Is Nothing Then
             Return CreateErrorResponse("Invalid or empty JSON payload")
         End If
-        
+
         If CheckForToken Then
             Try
                 Dim tokenValue = GetPropertyCaseInsensitive(payload, "Token")
@@ -1046,63 +858,63 @@ Public Function ProcessActionLink(
                     Return CreateErrorResponse("Please insert the token in a property called Token.")
                 End If
                 Dim token As String = CType(tokenValue, Newtonsoft.Json.Linq.JValue).Value.ToString()
-                If Not QWLib.Webutils.CheckToken2(token) Then 
+                If Not QWLib.Webutils.CheckToken2(token) Then
                     Return CreateErrorResponse("Invalid token.")
                 End If
             Catch ex As Exception
                 Return CreateErrorResponse("Please insert the token in a property called Token.")
             End Try
         End If
-        
+
         If p_validator IsNot Nothing Then
             Dim validationError As String = p_validator(payload)
             If Not String.IsNullOrEmpty(validationError) Then
                 Return validationError
             End If
         End If
-        
+
         Dim result As Object = p_businessLogic(database, payload)
         Dim StringResult As String = Newtonsoft.Json.JsonConvert.SerializeObject(result)
-        
+
         If LogMessage IsNot Nothing Then
             LogCustom(DB, StringPayload, StringResult, "Error at ValidatePayloadAndToken: ")
         End If
-        
+
         Return StringResult
     Catch ex As Exception
         Return CreateErrorResponse($"Internal error: {ex.Message}")
     End Try
 End Function
 
-Public Shared Function ParsePayload(Optional ByRef PayloadString As String = Nothing, 
+Public Shared Function ParsePayload(Optional ByRef PayloadString As String = Nothing,
                                    Optional ByRef ErrorMessage As String = Nothing) As Newtonsoft.Json.Linq.JObject
     Try
-        If System.Web.HttpContext.Current Is Nothing OrElse 
+        If System.Web.HttpContext.Current Is Nothing OrElse
            System.Web.HttpContext.Current.Request Is Nothing Then
             ErrorMessage = "HttpContext is not available"
             Return Nothing
         End If
-        
+
         System.Web.HttpContext.Current.Request.InputStream.Seek(0, System.IO.SeekOrigin.Begin)
-        
+
         Using reader As New System.IO.StreamReader(
-            System.Web.HttpContext.Current.Request.InputStream, 
+            System.Web.HttpContext.Current.Request.InputStream,
             System.Text.Encoding.UTF8)
-            
+
             Dim jsonString As String = reader.ReadToEnd()
-            
+
             If Not PayloadString Is Nothing Then
                 PayloadString = jsonString
             End If
-            
+
             If String.IsNullOrWhiteSpace(jsonString) Then
                 ErrorMessage = "Request payload is empty"
                 Return Nothing
             End If
-            
+
             Return Newtonsoft.Json.Linq.JObject.Parse(jsonString)
         End Using
-        
+
     Catch jsonEx As Newtonsoft.Json.JsonException
         ErrorMessage = $"Invalid JSON format: {jsonEx.Message}"
         Return Nothing
@@ -1186,33 +998,16 @@ Public Shared Function GetArrayParameter(payload As Newtonsoft.Json.Linq.JObject
     End Try
 End Function
 
-Public Shared Function getParameters(payload As Newtonsoft.Json.Linq.JObject, AllParametersList As String()) As System.Collections.Generic.Dictionary(Of String, Object)
-    Dim parameters As New System.Collections.Generic.Dictionary(Of String, Object)
-    For Each param As String In AllParametersList
-        Dim paramResult = GetObjectParameter(payload, param)
-        If paramResult.Item1 Then
-            parameters.Add(param, paramResult.Item2)
-        End If
-    Next
-    Return parameters
-End Function
-
-Public Shared Function getParameters(payload As Newtonsoft.Json.Linq.JObject, parameterMapping As System.Collections.Generic.Dictionary(Of String, String)) As System.Collections.Generic.Dictionary(Of String, Object)
-    Dim parameters As New System.Collections.Generic.Dictionary(Of String, Object)
-    For Each mapping As System.Collections.Generic.KeyValuePair(Of String, String) In parameterMapping
-        Dim paramResult = GetObjectParameter(payload, mapping.Key)
-        If paramResult.Item1 Then
-            parameters.Add(mapping.Value, paramResult.Item2)
-        End If
-    Next
-    Return parameters
-End Function
-
 Public Shared Function CreateErrorResponse(reason As String) As String
     Return Newtonsoft.Json.JsonConvert.SerializeObject(New With {.Result = "KO", .Reason = reason})
 End Function
 
-Public Shared Function ExecuteQueryToDictionary(database As Object, sql As String, parameters As System.Collections.Generic.Dictionary(Of String, Object), excludeFields As String()) As System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))
+''' <summary>
+''' Executes query and returns results as list of dictionaries
+''' NOTE: Use explicit field selection in your SQL (e.g., SELECT UserId, Email FROM Users)
+''' instead of SELECT * for better performance
+''' </summary>
+Public Shared Function ExecuteQueryToDictionary(database As Object, sql As String, parameters As System.Collections.Generic.Dictionary(Of String, Object)) As System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))
     Dim q As New QWTable()
     q.Database = database
     q.SQL = sql
@@ -1224,34 +1019,16 @@ Public Shared Function ExecuteQueryToDictionary(database As Object, sql As Strin
     q.RequestLive = False
     q.Active = True
 
-    ' PERFORMANCE NOTE: Field exclusion is provided for backward compatibility
-    ' BEST PRACTICE: Explicitly specify fields in your SELECT statement instead of SELECT *
-    ' Example: SELECT UserId, Email, Name FROM Users (instead of SELECT * and excluding Password)
-    Dim excludeSet As System.Collections.Generic.HashSet(Of String) = Nothing
-    If excludeFields IsNot Nothing AndAlso excludeFields.Length > 0 Then
-        excludeSet = New System.Collections.Generic.HashSet(Of String)(excludeFields, StringComparer.OrdinalIgnoreCase)
-    End If
-
-    ' PERFORMANCE: Pre-calculate capacity for better memory allocation
+    ' PERFORMANCE: Pre-allocate with estimated capacity
     Dim estimatedFieldCount As Integer = q.rowset.fields.size
-    If excludeSet IsNot Nothing Then
-        estimatedFieldCount = estimatedFieldCount - excludeSet.Count
-        If estimatedFieldCount < 0 Then estimatedFieldCount = q.rowset.fields.size
-    End If
-
     Dim rows As New System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))()
 
     While Not q.rowset.endofset
-        ' PERFORMANCE: Pre-allocate dictionary with estimated capacity
         Dim row As New System.Collections.Generic.Dictionary(Of String, Object)(estimatedFieldCount)
 
         For i As Integer = 1 To q.rowset.fields.size
             Dim fieldName As String = q.Rowset.fields(i).fieldname
-
-            ' Apply field exclusion only if needed (legacy feature)
-            If excludeSet Is Nothing OrElse Not excludeSet.Contains(fieldName) Then
-                row.Add(fieldName, q.rowset.fields(i).value)
-            End If
+            row.Add(fieldName, q.rowset.fields(i).value)
         Next
 
         rows.Add(row)
@@ -1267,7 +1044,7 @@ Public Shared Function GetDestinationIdentifier(ByRef payload As Newtonsoft.Json
         If payload Is Nothing Then
             Return New System.Tuple(Of Boolean, String)(False, "Invalid JSON payload")
         End If
-        
+
         Dim destinationToken = GetPropertyCaseInsensitive(payload, "DestinationIdentifier")
         If destinationToken IsNot Nothing Then
             Try
@@ -1296,33 +1073,16 @@ Public Function CreateValidatorForBatch(requiredArrayParams As String()) As Syst
     Return AddressOf New ValidatorForBatchWrapper(requiredArrayParams).Validate
 End Function
 
-Public Function CreateBusinessLogicForReadingRows(tableName As String, AllParametersList As String(), excludeFields As String(), Optional useLikeOperator As Boolean = True) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicReaderWrapper(tableName, AllParametersList, excludeFields, useLikeOperator).Execute
-End Function
-
-Public Function CreateBusinessLogicForWritingRows(tableName As String, AllParametersList As String(), RequiredParametersList As String(), allowUpdates As Boolean) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicWriterWrapper(tableName, AllParametersList, RequiredParametersList, allowUpdates).Execute
-End Function
-
-Public Function CreateBusinessLogicForWritingRowsBatch(tableName As String, AllParametersList As String(), RequiredParametersList As String(), allowUpdates As Boolean) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicBatchWriterWrapper(tableName, AllParametersList, RequiredParametersList, allowUpdates).Execute
-End Function
-
-' ===================================
-' ENHANCED FACTORY FUNCTIONS
-' ===================================
-
-Public Function CreateAdvancedBusinessLogicForReading(
+Public Function CreateBusinessLogicForReading(
     baseSQL As String,
     parameterConditions As System.Collections.Generic.Dictionary(Of String, Object),
-    Optional excludeFields As String() = Nothing,
     Optional defaultWhereClause As String = Nothing,
     Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicAdvancedReaderWrapper(baseSQL, parameterConditions, excludeFields, defaultWhereClause, fieldMappings).Execute
+    Return AddressOf New BusinessLogicReaderWrapper(baseSQL, parameterConditions, defaultWhereClause, fieldMappings).Execute
 End Function
 
-Public Function CreateAdvancedBusinessLogicForWriting(
+Public Function CreateBusinessLogicForWriting(
     tableName As String,
     fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping),
     keyFields As String(),
@@ -1331,7 +1091,16 @@ Public Function CreateAdvancedBusinessLogicForWriting(
     Optional customUpdateSQL As String = Nothing,
     Optional customWhereClause As String = Nothing
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicAdvancedWriterWrapper(tableName, fieldMappings, keyFields, allowUpdates, customExistenceCheckSQL, customUpdateSQL, customWhereClause).Execute
+    Return AddressOf New BusinessLogicWriterWrapper(tableName, fieldMappings, keyFields, allowUpdates, customExistenceCheckSQL, customUpdateSQL, customWhereClause).Execute
+End Function
+
+Public Function CreateBusinessLogicForBatchWriting(
+    tableName As String,
+    fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping),
+    keyFields As String(),
+    allowUpdates As Boolean
+) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
+    Return AddressOf New BusinessLogicBatchWriterWrapper(tableName, fieldMappings, keyFields, allowUpdates).Execute
 End Function
 
 Public Shared Function ValidatePayloadAndToken(DB As Object, _
@@ -1354,9 +1123,9 @@ Public Shared Function ValidatePayloadAndToken(DB As Object, _
                 Return tokenValidationResult
             End If
         End If
-        
+
         Return Nothing
-        
+
     Catch ex As Exception
         Return CreateErrorResponse($"Unexpected error during payload validation: {ex.Message} - Context: {loggerContext}")
     End Try
@@ -1368,7 +1137,7 @@ Private Shared Function ValidateToken(DB As Object, ParsedPayload As Newtonsoft.
         If token Is Nothing Then
             Return CreateErrorResponse("Insert the token into a property called Token. " & loggerContext & " error at token validation.")
         End If
-        
+
         If token.Type <> Newtonsoft.Json.Linq.JTokenType.String Then
             Return CreateErrorResponse("Token must be a string value. " & loggerContext & " error at token validation.")
         End If
@@ -1382,7 +1151,7 @@ Private Shared Function ValidateToken(DB As Object, ParsedPayload As Newtonsoft.
         Return CreateErrorResponse("Error while checking token: " & ex.Message & " " & loggerContext & " error at token validation.")
     End Try
 End Function
-'''''
+
 ' ===================================
 ' FACTORY FUNCTIONS FOR PARAMETER CONDITIONS AND FIELD MAPPINGS
 ' ===================================
@@ -1391,10 +1160,10 @@ End Function
 ''' Creates a ParameterCondition without requiring direct class instantiation
 ''' </summary>
 Public Function CreateParameterCondition(
-    paramName As String, 
-    sqlWhenPresent As String, 
-    Optional sqlWhenAbsent As String = Nothing, 
-    Optional useParameter As Boolean = True, 
+    paramName As String,
+    sqlWhenPresent As String,
+    Optional sqlWhenAbsent As String = Nothing,
+    Optional useParameter As Boolean = True,
     Optional defaultValue As Object = Nothing
 ) As ParameterCondition
     Return New ParameterCondition(paramName, sqlWhenPresent, sqlWhenAbsent, useParameter, defaultValue)
@@ -1404,9 +1173,9 @@ End Function
 ''' Creates a FieldMapping without requiring direct class instantiation
 ''' </summary>
 Public Function CreateFieldMapping(
-    jsonProp As String, 
-    sqlCol As String, 
-    Optional isRequired As Boolean = False, 
+    jsonProp As String,
+    sqlCol As String,
+    Optional isRequired As Boolean = False,
     Optional defaultVal As Object = Nothing
 ) As FieldMapping
     Return New FieldMapping(jsonProp, sqlCol, isRequired, defaultVal)
@@ -1416,23 +1185,23 @@ End Function
 ''' Creates a dictionary of ParameterCondition objects from parallel arrays
 ''' </summary>
 Public Function CreateParameterConditionsDictionary(
-    paramNames As String(), 
-    sqlWhenPresentArray As String(), 
+    paramNames As String(),
+    sqlWhenPresentArray As String(),
     Optional sqlWhenAbsentArray As String() = Nothing,
     Optional useParameterArray As Boolean() = Nothing,
     Optional defaultValueArray As Object() = Nothing
 ) As System.Collections.Generic.Dictionary(Of String, Object)
-    
+
     Dim dict As New System.Collections.Generic.Dictionary(Of String, Object)
-    
+
     For i As Integer = 0 To paramNames.Length - 1
         Dim sqlAbsent As String = If(sqlWhenAbsentArray IsNot Nothing AndAlso i < sqlWhenAbsentArray.Length, sqlWhenAbsentArray(i), Nothing)
         Dim useParam As Boolean = If(useParameterArray IsNot Nothing AndAlso i < useParameterArray.Length, useParameterArray(i), True)
         Dim defValue As Object = If(defaultValueArray IsNot Nothing AndAlso i < defaultValueArray.Length, defaultValueArray(i), Nothing)
-        
+
         dict.Add(paramNames(i), New ParameterCondition(paramNames(i), sqlWhenPresentArray(i), sqlAbsent, useParam, defValue))
     Next
-    
+
     Return dict
 End Function
 
@@ -1440,20 +1209,21 @@ End Function
 ''' Creates a dictionary of FieldMapping objects from parallel arrays
 ''' </summary>
 Public Function CreateFieldMappingsDictionary(
-    jsonProps As String(), 
-    sqlCols As String(), 
+    jsonProps As String(),
+    sqlCols As String(),
     Optional isRequiredArray As Boolean() = Nothing,
     Optional defaultValArray As Object() = Nothing
 ) As System.Collections.Generic.Dictionary(Of String, FieldMapping)
-    
+
     Dim dict As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
-    
+
     For i As Integer = 0 To jsonProps.Length - 1
         Dim isReq As Boolean = If(isRequiredArray IsNot Nothing AndAlso i < isRequiredArray.Length, isRequiredArray(i), False)
         Dim defVal As Object = If(defaultValArray IsNot Nothing AndAlso i < defaultValArray.Length, defaultValArray(i), Nothing)
-        
+
         dict.Add(jsonProps(i), New FieldMapping(jsonProps(i), sqlCols(i), isReq, defVal))
     Next
-    
+
     Return dict
 End Function
+
