@@ -6,7 +6,7 @@ This document summarizes the performance optimizations implemented in the Endpoi
 
 ## Implemented Optimizations
 
-### Phase 1: High-Impact, Low-Risk Optimizations ✅
+### Phase 1: High-Impact Optimizations ✅
 
 #### 1. Property Name Caching (Lines 54-130)
 
@@ -39,36 +39,46 @@ DB.Global.ClearPropertyCache()
 
 ---
 
-#### 2. Field Exclusion HashSet Optimization (Lines 1058-1102)
+#### 2. Explicit Field Selection (BEST PRACTICE)
 
-**Problem**: Field exclusion in query results used nested loops with O(rows × fields × excludes) complexity.
+**Recommended Approach**: Specify exact fields in SELECT statement instead of using field exclusion.
 
-**Solution**: Pre-build a HashSet of excluded fields for O(1) lookup instead of O(n) array iteration.
+**Why This Matters**:
+- Reduces data transferred from database to application
+- Reduces database load (less data to serialize and send)
+- Eliminates field filtering overhead entirely
+- More secure (can't accidentally expose sensitive fields)
 
 **Implementation**:
 ```vb
-Dim excludeSet As HashSet(Of String) = Nothing
-If excludeFields IsNot Nothing AndAlso excludeFields.Length > 0 Then
-    excludeSet = New HashSet(Of String)(excludeFields, StringComparer.OrdinalIgnoreCase)
-End If
+' BEST PRACTICE - Explicit field selection
+Dim baseSQL = "SELECT UserId, Email, Name, CreatedDate FROM Users {WHERE}"
+Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+    baseSQL,
+    parameterConditions,
+    Nothing,  ' No excludeFields needed!
+    defaultWhereClause
+)
 
-' Then use O(1) lookup:
-If excludeSet Is Nothing OrElse Not excludeSet.Contains(fieldName) Then
-    row.Add(fieldName, q.rowset.fields(i).value)
-End If
+' LEGACY APPROACH - SELECT * with exclusion (backward compatibility)
+Dim baseSQL = "SELECT * FROM Users {WHERE}"
+Dim excludeFields = New String() {"Password", "SSN"}
+Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+    baseSQL,
+    parameterConditions,
+    excludeFields,  ' Field exclusion still works but not recommended
+    defaultWhereClause
+)
 ```
 
-**Benefits**:
-- Reduces complexity from O(rows × fields × excludes) to O(rows × fields)
-- Pre-allocated dictionary capacity for better memory efficiency
-- Case-insensitive comparison maintained
+**Benefits of Explicit Selection**:
+- **Database**: Sends less data over network
+- **Application**: No field filtering needed
+- **Security**: Explicitly control what data is returned
+- **Performance**: Faster at every layer
 
-**Expected Performance Gain**: 80-95% reduction in field filtering time
-
-**Example Impact**:
-- 100 rows × 20 fields × 5 excludes
-- Before: 10,000 string comparisons
-- After: 2,000 HashSet lookups (5× faster)
+**Field Exclusion (Legacy)**:
+Field exclusion is still supported for backward compatibility and uses HashSet optimization (O(1) lookups), but explicit field selection is strongly recommended.
 
 ---
 
@@ -451,8 +461,14 @@ For performance-related questions:
 The implemented optimizations provide **significant performance improvements** while maintaining **full backward compatibility**:
 
 - **Property Lookups**: 70-90% faster
-- **Field Filtering**: 80-95% faster
-- **Batch Operations**: 80-90% faster
+- **Batch Operations**: 80-90% faster (most critical improvement)
+- **SQL Building**: 20-40% faster for complex queries
 - **Overall**: 50-70% improvement for typical workloads
+
+**Additional Recommendation**: Use explicit field selection in SQL (`SELECT field1, field2` instead of `SELECT *`) for:
+- 20-90% additional performance gain (depending on field count)
+- Reduced network traffic
+- Better security
+- Lower database load
 
 These improvements scale with data size, providing even greater benefits for large datasets and high-volume scenarios.

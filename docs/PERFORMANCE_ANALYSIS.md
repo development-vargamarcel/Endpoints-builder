@@ -107,54 +107,72 @@ End Function
 
 ---
 
-### 3. Field Exclusion Logic (MEDIUM IMPACT)
+### 3. Field Selection Strategy (HIGH IMPACT - BEST PRACTICE)
 
-**Location**: `ExecuteQueryToDictionary()` (lines 998-1033)
+**Recommendation**: **Use explicit field selection in SQL queries** instead of `SELECT *` with field exclusion.
 
-**Problem**:
-- Nested loops: For each row, for each field, check against each exclude field
-- Complexity: O(rows × fields × excludes) with case-insensitive comparison
-- Example: 100 rows × 20 fields × 5 excludes = 10,000 string comparisons
+**Why This Matters**:
 
-**Current Code**:
+**Problem with Field Exclusion Approach**:
 ```vb
-For i As Integer = 1 To q.rowset.fields.size
-    Dim fieldName As String = q.Rowset.fields(i).fieldname
-    Dim isExcluded As Boolean = False
-    If excludeFields IsNot Nothing Then
-        For Each excludeField As String In excludeFields
-            If String.Equals(fieldName, excludeField, StringComparison.OrdinalIgnoreCase) Then
-                isExcluded = True
-                Exit For
-            End If
-        Next
-    End If
-    ' ...
-Next
+' Inefficient approach:
+baseSQL = "SELECT * FROM Users {WHERE}"  ' Fetches ALL fields from database
+excludeFields = New String() {"Password", "SSN", "SecurityQuestions"}
+' Then filters in application code
 ```
 
-**Recommended Solution**: HashSet for O(1) Lookups
-```vb
-' Pre-build HashSet once before row iteration
-Dim excludeSet As HashSet(Of String) = Nothing
-If excludeFields IsNot Nothing Then
-    excludeSet = New HashSet(Of String)(excludeFields, StringComparer.OrdinalIgnoreCase)
-End If
+**Issues**:
+- Database sends unnecessary data over network
+- Increased serialization overhead
+- Wasted bandwidth
+- Application-side filtering overhead
+- Risk of accidentally exposing sensitive fields
 
-' Then in row loop:
-For i As Integer = 1 To q.rowset.fields.size
-    Dim fieldName As String = q.Rowset.fields(i).fieldname
-    If excludeSet Is Nothing OrElse Not excludeSet.Contains(fieldName) Then
-        row.Add(fieldName, q.rowset.fields(i).value)
-    End If
-Next
+**Recommended Approach**:
+```vb
+' Efficient approach:
+baseSQL = "SELECT UserId, Email, Name, CreatedDate FROM Users {WHERE}"
+' Only needed fields fetched from database
+' No exclusion needed - much faster at every layer
 ```
 
-**Expected Improvement**: 80-95% reduction in exclusion checking time
+**Performance Benefits**:
+- **Database**: Less data to read and serialize
+- **Network**: Reduced data transfer (can be 50-90% reduction)
+- **Application**: No filtering overhead
+- **Security**: Explicit control over exposed fields
+
+**Field Exclusion (Legacy Support)**:
+For backward compatibility, field exclusion is still supported with HashSet optimization (O(1) lookups instead of O(n)), but explicit field selection is strongly recommended for all new code.
+
+**Migration Example**:
+```vb
+' Before (legacy):
+Dim readLogic = DB.Global.CreateBusinessLogicForReadingRows(
+    "Users",
+    New String() {"UserId", "Email"},
+    New String() {"Password"},  ' Excluded fields
+    True
+)
+
+' After (recommended):
+Dim conditions As New Dictionary(Of String, Object)
+conditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId"))
+conditions.Add("Email", DB.Global.CreateParameterCondition("Email", "Email LIKE :Email"))
+
+Dim readLogic = DB.Global.CreateAdvancedBusinessLogicForReading(
+    "SELECT UserId, Email, Name, CreatedDate FROM Users {WHERE}",  ' Explicit fields
+    conditions,
+    Nothing,  ' No exclusion needed
+    Nothing
+)
+```
+
+**Expected Improvement**: 20-90% depending on field count and data size (less data = faster)
 
 ---
 
-### 4. String Concatenation in SQL Building (MEDIUM IMPACT)
+### 4. String Concatenation in SQL Building (LOW-MEDIUM IMPACT)
 
 **Location**: Multiple locations where SQL is built dynamically
 

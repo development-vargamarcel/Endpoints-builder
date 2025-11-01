@@ -1224,16 +1224,20 @@ Public Shared Function ExecuteQueryToDictionary(database As Object, sql As Strin
     q.RequestLive = False
     q.Active = True
 
-    ' PERFORMANCE: Pre-build HashSet for O(1) field exclusion lookup instead of O(n) array iteration
-    ' This changes complexity from O(rows × fields × excludes) to O(rows × fields)
+    ' PERFORMANCE NOTE: Field exclusion is provided for backward compatibility
+    ' BEST PRACTICE: Explicitly specify fields in your SELECT statement instead of SELECT *
+    ' Example: SELECT UserId, Email, Name FROM Users (instead of SELECT * and excluding Password)
     Dim excludeSet As System.Collections.Generic.HashSet(Of String) = Nothing
     If excludeFields IsNot Nothing AndAlso excludeFields.Length > 0 Then
         excludeSet = New System.Collections.Generic.HashSet(Of String)(excludeFields, StringComparer.OrdinalIgnoreCase)
     End If
 
     ' PERFORMANCE: Pre-calculate capacity for better memory allocation
-    Dim estimatedFieldCount As Integer = q.rowset.fields.size - If(excludeSet IsNot Nothing, excludeSet.Count, 0)
-    If estimatedFieldCount < 0 Then estimatedFieldCount = q.rowset.fields.size
+    Dim estimatedFieldCount As Integer = q.rowset.fields.size
+    If excludeSet IsNot Nothing Then
+        estimatedFieldCount = estimatedFieldCount - excludeSet.Count
+        If estimatedFieldCount < 0 Then estimatedFieldCount = q.rowset.fields.size
+    End If
 
     Dim rows As New System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))()
 
@@ -1244,7 +1248,7 @@ Public Shared Function ExecuteQueryToDictionary(database As Object, sql As Strin
         For i As Integer = 1 To q.rowset.fields.size
             Dim fieldName As String = q.Rowset.fields(i).fieldname
 
-            ' PERFORMANCE: O(1) HashSet lookup instead of O(n) array iteration
+            ' Apply field exclusion only if needed (legacy feature)
             If excludeSet Is Nothing OrElse Not excludeSet.Contains(fieldName) Then
                 row.Add(fieldName, q.rowset.fields(i).value)
             End If

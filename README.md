@@ -463,7 +463,15 @@ See [PERFORMANCE_IMPROVEMENTS.md](docs/PERFORMANCE_IMPROVEMENTS.md) for detailed
 ### Performance Best Practices
 
 1. **Use indexes** on columns used in WHERE clauses
-2. **Exclude unnecessary fields** to reduce payload size
+2. **Specify exact fields in SELECT** instead of `SELECT *` - reduces data transfer and processing
+   ```vb
+   ' GOOD - Explicit field selection
+   baseSQL = "SELECT UserId, Email, Name FROM Users {WHERE}"
+
+   ' AVOID - SELECT * with field exclusion (legacy approach)
+   baseSQL = "SELECT * FROM Users {WHERE}"
+   excludeFields = New String() {"Password"}
+   ```
 3. **Use batch operations** for multiple records (significantly faster than individual operations)
 4. **Implement pagination** for large result sets
 5. **Monitor cache performance** with `GetPropertyCacheStats()`
