@@ -49,7 +49,7 @@ Function ProcessActionLink(
 Return DB.Global.ProcessActionLink(
     DB,
     DB.Global.CreateValidator(New String() {"UserId"}),
-    DB.Global.CreateBusinessLogicForReadingRows("Users", New String() {"UserId"}, Nothing, False),
+    DB.Global.CreateBusinessLogicForReading("Users", New String() {"UserId"}, Nothing, False),
     "User query",
     ParsedPayload,
     StringPayload,
@@ -141,12 +141,12 @@ Dim batchValidator = DB.Global.CreateValidatorForBatch(New String() {"Records"})
 
 ## Factory Functions
 
-### CreateBusinessLogicForReadingRows
+### CreateBusinessLogicForReading
 
 Creates standard read logic for a table.
 
 ```vb
-Function CreateBusinessLogicForReadingRows(
+Function CreateBusinessLogicForReading(
     tableName As String,
     AllParametersList As String(),
     excludeFields As String(),
@@ -164,7 +164,7 @@ Function CreateBusinessLogicForReadingRows(
 
 **Example:**
 ```vb
-Dim readLogic = DB.Global.CreateBusinessLogicForReadingRows(
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
     "Users",
     New String() {"UserId", "Email", "Name"},
     New String() {"Password", "PasswordHash"},
@@ -183,12 +183,12 @@ SELECT * FROM Users WHERE UserId = :UserId AND Email = :Email
 
 ---
 
-### CreateBusinessLogicForWritingRows
+### CreateBusinessLogicForWriting
 
 Creates standard write logic (insert/update) for a table.
 
 ```vb
-Function CreateBusinessLogicForWritingRows(
+Function CreateBusinessLogicForWriting(
     tableName As String,
     AllParametersList As String(),
     RequiredParametersList As String(),
@@ -206,7 +206,7 @@ Function CreateBusinessLogicForWritingRows(
 
 **Example:**
 ```vb
-Dim writeLogic = DB.Global.CreateBusinessLogicForWritingRows(
+Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
     New String() {"UserId", "Email", "Name", "Department"},
     New String() {"UserId"},
@@ -222,12 +222,12 @@ Dim writeLogic = DB.Global.CreateBusinessLogicForWritingRows(
 
 ---
 
-### CreateBusinessLogicForWritingRowsBatch
+### CreateBusinessLogicForWritingBatch
 
 Creates batch write logic for multiple records.
 
 ```vb
-Function CreateBusinessLogicForWritingRowsBatch(
+Function CreateBusinessLogicForWritingBatch(
     tableName As String,
     AllParametersList As String(),
     RequiredParametersList As String(),
@@ -236,13 +236,13 @@ Function CreateBusinessLogicForWritingRowsBatch(
 ```
 
 **Parameters:**
-- Same as `CreateBusinessLogicForWritingRows`
+- Same as `CreateBusinessLogicForWriting`
 
 **Returns:** Business logic function
 
 **Example:**
 ```vb
-Dim batchLogic = DB.Global.CreateBusinessLogicForWritingRowsBatch(
+Dim batchLogic = DB.Global.CreateBusinessLogicForWritingBatch(
     "Products",
     New String() {"ProductId", "Name", "Price"},
     New String() {"ProductId"},
@@ -276,12 +276,12 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForWritingRowsBatch(
 
 ## Advanced Factory Functions
 
-### CreateAdvancedBusinessLogicForReading
+### CreateBusinessLogicForReading
 
 Creates advanced read logic with custom SQL and parameter conditions.
 
 ```vb
-Function CreateAdvancedBusinessLogicForReading(
+Function CreateBusinessLogicForReading(
     baseSQL As String,
     parameterConditions As Dictionary(Of String, Object),
     Optional excludeFields As String() = Nothing,
@@ -313,7 +313,7 @@ conditions.Add("endDate", DB.Global.CreateParameterCondition(
     Nothing
 ))
 
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForReading(
+Dim logic = DB.Global.CreateBusinessLogicForReading(
     "SELECT * FROM Orders {WHERE} ORDER BY OrderDate DESC",
     conditions,
     Nothing,
@@ -809,22 +809,22 @@ Public Sub New(
 
 #### Simple Read
 ```vb
-DB.Global.CreateBusinessLogicForReadingRows(tableName, fields, excludeFields, useLike)
+DB.Global.CreateBusinessLogicForReading(tableName, fields, excludeFields, useLike)
 ```
 
 #### Simple Write
 ```vb
-DB.Global.CreateBusinessLogicForWritingRows(tableName, allFields, keyFields, allowUpdates)
+DB.Global.CreateBusinessLogicForWriting(tableName, allFields, keyFields, allowUpdates)
 ```
 
 #### Advanced Read with Conditions
 ```vb
-DB.Global.CreateAdvancedBusinessLogicForReading(baseSQL, conditions, excludeFields, defaultWhere, mappings)
+DB.Global.CreateBusinessLogicForReading(baseSQL, conditions, excludeFields, defaultWhere, mappings)
 ```
 
 #### Batch Operations
 ```vb
-DB.Global.CreateBusinessLogicForWritingRowsBatch(tableName, allFields, keyFields, allowUpdates)
+DB.Global.CreateBusinessLogicForWritingBatch(tableName, allFields, keyFields, allowUpdates)
 ```
 
 ---

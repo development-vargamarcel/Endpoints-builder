@@ -49,13 +49,9 @@ If DestinationIdentifierInfo.Item1 Then
     If destinationId = "document-read" Then
         Return DB.Global.ProcessActionLink(DB,
             DB.Global.CreateValidator(New String() {"maxDtPubbl"}),
-            DB.Global.CreateAdvancedBusinessLogicForReading(
-                "SELECT 
-                *
-                FROM document {WHERE}
-                order by data_pubbl asc",
+            DB.Global.CreateBusinessLogicForReading(
+                "SELECT tipo, numero, DATA_PUBBL FROM document {WHERE} ORDER BY data_pubbl ASC",
                 searchConditions,
-                Nothing,
                 "1=0"
             ),
             "Search executed.",
