@@ -181,6 +181,7 @@ Public Class BusinessLogicReaderWrapper
     Private ReadOnly _defaultWhereClause As String
     Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping)
     Private ReadOnly _useForJsonPath As Boolean
+    Private ReadOnly _includeExecutedSQL As Boolean
 
     ''' <summary>
     ''' Reader with full SQL customization. Use explicit SELECT fields (not SELECT *)
@@ -190,16 +191,19 @@ Public Class BusinessLogicReaderWrapper
     ''' <param name="defaultWhereClause">Default WHERE clause if no parameters provided</param>
     ''' <param name="fieldMappings">Optional JSON-to-SQL field mappings</param>
     ''' <param name="useForJsonPath">If True, uses SQL Server FOR JSON PATH for better performance (40-60% faster for simple queries)</param>
+    ''' <param name="includeExecutedSQL">If True, includes the executed SQL query in the response (default: True for backward compatibility)</param>
     Public Sub New(baseSQL As String, _
                    parameterConditions As System.Collections.Generic.Dictionary(Of String, Object), _
                    Optional defaultWhereClause As String = Nothing, _
                    Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing, _
-                   Optional useForJsonPath As Boolean = False)
+                   Optional useForJsonPath As Boolean = False, _
+                   Optional includeExecutedSQL As Boolean = True)
         _baseSQL = baseSQL
         _parameterConditions = If(parameterConditions, New System.Collections.Generic.Dictionary(Of String, Object))
         _defaultWhereClause = defaultWhereClause
         _fieldMappings = fieldMappings
         _useForJsonPath = useForJsonPath
+        _includeExecutedSQL = includeExecutedSQL
     End Sub
 
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
@@ -309,36 +313,48 @@ Public Class BusinessLogicReaderWrapper
                     ' This validates that SQL Server generated valid JSON
                     Dim recordsArray = Newtonsoft.Json.Linq.JArray.Parse(jsonRecords)
 
-                    Return New With {
-                        .Result = "OK",
-                        .ProvidedParameters = String.Join(",", providedParams),
-                        .ExecutedSQL = finalSQL & " FOR JSON PATH",
-                        .Records = recordsArray
-                    }
+                    ' Build response conditionally including ExecutedSQL
+                    Dim response As New System.Collections.Generic.Dictionary(Of String, Object)
+                    response.Add("Result", "OK")
+                    response.Add("ProvidedParameters", String.Join(",", providedParams))
+                    If _includeExecutedSQL Then
+                        response.Add("ExecutedSQL", finalSQL & " FOR JSON PATH")
+                    End If
+                    response.Add("Records", recordsArray)
+
+                    Return response
                 Catch jsonEx As Newtonsoft.Json.JsonException
                     ' FOR JSON PATH failed due to malformed JSON (unescaped chars, etc.)
                     ' AUTOMATIC FALLBACK: Retry with standard Dictionary mode
                     Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
 
-                    Return New With {
-                        .Result = "OK",
-                        .ProvidedParameters = String.Join(",", providedParams),
-                        .ExecutedSQL = finalSQL,
-                        .Records = rows,
-                        .PerformanceMode = "Standard (FOR JSON PATH failed - data contains special characters)",
-                        .FallbackReason = $"JSON parsing error: {jsonEx.Message}"
-                    }
+                    ' Build response conditionally including ExecutedSQL
+                    Dim response As New System.Collections.Generic.Dictionary(Of String, Object)
+                    response.Add("Result", "OK")
+                    response.Add("ProvidedParameters", String.Join(",", providedParams))
+                    If _includeExecutedSQL Then
+                        response.Add("ExecutedSQL", finalSQL)
+                    End If
+                    response.Add("Records", rows)
+                    response.Add("PerformanceMode", "Standard (FOR JSON PATH failed - data contains special characters)")
+                    response.Add("FallbackReason", $"JSON parsing error: {jsonEx.Message}")
+
+                    Return response
                 End Try
             Else
                 ' STANDARD MODE: Dictionary conversion in VB code (more flexible for complex transformations)
                 Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
 
-                Return New With {
-                    .Result = "OK",
-                    .ProvidedParameters = String.Join(",", providedParams),
-                    .ExecutedSQL = finalSQL,
-                    .Records = rows
-                }
+                ' Build response conditionally including ExecutedSQL
+                Dim response As New System.Collections.Generic.Dictionary(Of String, Object)
+                response.Add("Result", "OK")
+                response.Add("ProvidedParameters", String.Join(",", providedParams))
+                If _includeExecutedSQL Then
+                    response.Add("ExecutedSQL", finalSQL)
+                End If
+                response.Add("Records", rows)
+
+                Return response
             End If
         Catch ex As Exception
             Return Newtonsoft.Json.JsonConvert.DeserializeObject(
@@ -1308,9 +1324,10 @@ Public Function CreateBusinessLogicForReading(
     parameterConditions As System.Collections.Generic.Dictionary(Of String, Object),
     Optional defaultWhereClause As String = Nothing,
     Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing,
-    Optional useForJsonPath As Boolean = False
+    Optional useForJsonPath As Boolean = False,
+    Optional includeExecutedSQL As Boolean = True
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicReaderWrapper(baseSQL, parameterConditions, defaultWhereClause, fieldMappings, useForJsonPath).Execute
+    Return AddressOf New BusinessLogicReaderWrapper(baseSQL, parameterConditions, defaultWhereClause, fieldMappings, useForJsonPath, includeExecutedSQL).Execute
 End Function
 
 Public Function CreateBusinessLogicForWriting(

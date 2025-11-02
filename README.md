@@ -13,12 +13,14 @@ A production-ready Visual Basic .NET library for building flexible, secure REST 
 - **Case-Insensitive**: Parameters are case-insensitive for better usability
 - **Backward Compatible**: Standard and advanced APIs for different use cases
 - **⚡ High Performance**: FOR JSON PATH support for 40-60% faster queries
+- **Library Options**: Control response content (e.g., include/exclude executed SQL queries)
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
+- [Library Options](#library-options)
 - [API Reference](#api-reference)
 - [Usage Examples](#usage-examples)
 - [Security Best Practices](#security-best-practices)
@@ -129,6 +131,68 @@ Dim batchValidator = DB.Global.CreateValidatorForBatch(
 )
 ```
 
+## Library Options
+
+The library provides various options to control response behavior and functionality.
+
+### includeExecutedSQL Option
+
+Control whether the executed SQL query is included in the response. This option is available in `CreateBusinessLogicForReading`.
+
+**Parameters:**
+- `includeExecutedSQL` (Boolean, Optional): If `True`, includes the executed SQL query in the response. Default: `True` (for backward compatibility)
+
+**Use Cases:**
+
+#### Development/Debug Mode (Default)
+```vb
+' Include SQL in response (default behavior - backward compatible)
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT UserId, Email, Name FROM Users {WHERE}",
+    searchConditions,
+    Nothing,      ' defaultWhereClause
+    Nothing,      ' fieldMappings
+    True          ' useForJsonPath
+    ' includeExecutedSQL defaults to True
+)
+
+' Response includes ExecutedSQL field:
+' {
+'     "Result": "OK",
+'     "ProvidedParameters": "UserId",
+'     "ExecutedSQL": "SELECT UserId, Email, Name FROM Users WHERE UserId = :UserId FOR JSON PATH",
+'     "Records": [...]
+' }
+```
+
+#### Production Mode (Hide SQL)
+```vb
+' Exclude SQL from response for security/performance
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT UserId, Email, Name FROM Users {WHERE}",
+    searchConditions,
+    Nothing,      ' defaultWhereClause
+    Nothing,      ' fieldMappings
+    True,         ' useForJsonPath
+    False         ' includeExecutedSQL = False (SQL will NOT be in response)
+)
+
+' Response excludes ExecutedSQL field:
+' {
+'     "Result": "OK",
+'     "ProvidedParameters": "UserId",
+'     "Records": [...]
+' }
+```
+
+**Benefits:**
+- **Security**: Hide database schema and query structure from clients in production
+- **Performance**: Reduce response payload size
+- **Debugging**: Keep SQL visible in development for troubleshooting
+- **Backward Compatible**: Defaults to `True`, so existing code continues to work unchanged
+
+**Example:** See `examples/LibraryOptionsExample.vb` for comprehensive examples of using library options.
+
 ## API Reference
 
 ### Factory Functions
@@ -183,12 +247,21 @@ Creates batch write logic for multiple records.
 Function CreateBusinessLogicForReading(
     baseSQL As String,
     parameterConditions As Dictionary(Of String, Object),
-    Optional excludeFields As String() = Nothing,
     Optional defaultWhereClause As String = Nothing,
-    Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing
+    Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing,
+    Optional useForJsonPath As Boolean = False,
+    Optional includeExecutedSQL As Boolean = True
 ) As Func(Of Object, JObject, Object)
 ```
 Creates advanced read logic with custom SQL and parameter conditions.
+
+**Parameters:**
+- `baseSQL`: Base SQL query with {WHERE} placeholder
+- `parameterConditions`: Dictionary of parameter conditions
+- `defaultWhereClause`: Default WHERE clause if no parameters provided (optional)
+- `fieldMappings`: JSON-to-SQL field mappings (optional)
+- `useForJsonPath`: If True, uses FOR JSON PATH for better performance (optional, default: False)
+- `includeExecutedSQL`: If True, includes executed SQL in response (optional, default: True)
 
 #### CreateAdvancedBusinessLogicForWriting
 ```vb
@@ -256,6 +329,7 @@ See the `examples/` directory for comprehensive examples:
 - **AdvancedQueries.vb**: Complex queries with parameter conditions
 - **BatchOperations.vb**: Batch insert/update operations
 - **FieldMappingExample.vb**: JSON to SQL field mapping
+- **LibraryOptionsExample.vb**: Library options (includeExecutedSQL, etc.)
 - **ErrorHandling.vb**: Error handling patterns
 - **SecurityPatterns.vb**: Token validation and security
 
@@ -361,11 +435,14 @@ conditions.Add("email", DB.Global.CreateParameterCondition(
 {
     "Result": "OK",
     "ProvidedParameters": "userId,email",
+    "ExecutedSQL": "SELECT UserId, Email, Name FROM Users WHERE UserId = :UserId",
     "Records": [
         {"UserId": "123", "Email": "user@example.com", "Name": "John Doe"}
     ]
 }
 ```
+
+**Note**: The `ExecutedSQL` field is included by default but can be excluded by setting `includeExecutedSQL = False` in `CreateBusinessLogicForReading`. See [Library Options](#library-options) for details.
 
 ### Success Response (Write)
 ```json
@@ -408,6 +485,7 @@ Endpoints-builder/
 │   ├── AdvancedQueries.vb          # Advanced query examples
 │   ├── BatchOperations.vb          # Batch operation examples
 │   ├── FieldMappingExample.vb      # Field mapping examples
+│   ├── LibraryOptionsExample.vb    # Library options examples
 │   ├── ErrorHandling.vb            # Error handling patterns
 │   └── SecurityPatterns.vb         # Security best practices
 ├── docs/
