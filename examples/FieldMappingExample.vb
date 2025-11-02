@@ -29,8 +29,8 @@ fieldMappings.Add("department", DB.Global.CreateFieldMapping("department", "DEPT
 ' Define key fields (using SQL column names)
 Dim keyFields = New String() {"USER_ID"}
 
-' Create advanced writer with field mappings
-Dim mappedWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+' Create writer with field mappings
+Dim mappedWriter = DB.Global.CreateBusinessLogicForWriting(
     "USERS_TABLE",
     fieldMappings,
     keyFields,
@@ -88,7 +88,7 @@ mappings2.Add("notes", DB.Global.CreateFieldMapping("notes", "NOTES", False, Not
 mappings2.Add("shippingAddress", DB.Global.CreateFieldMapping("shippingAddress", "SHIPPING_ADDR", False, Nothing))
 mappings2.Add("priority", DB.Global.CreateFieldMapping("priority", "PRIORITY_LEVEL", False, "NORMAL"))
 
-Dim writer2 = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim writer2 = DB.Global.CreateBusinessLogicForWriting(
     "ORDERS",
     mappings2,
     New String() {"ORDER_ID"},
@@ -138,7 +138,7 @@ mappings3.Add("stockQuantity", DB.Global.CreateFieldMapping("stockQuantity", "ST
 mappings3.Add("taxRate", DB.Global.CreateFieldMapping("taxRate", "TAX_RATE", False, 0.10))
 mappings3.Add("isVisible", DB.Global.CreateFieldMapping("isVisible", "IS_VISIBLE", False, True))
 
-Dim writer3 = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim writer3 = DB.Global.CreateBusinessLogicForWriting(
     "PRODUCTS",
     mappings3,
     New String() {"PRODUCT_ID"},
@@ -249,7 +249,7 @@ legacyMappings.Add("jobTitle", DB.Global.CreateFieldMapping("jobTitle", "JOB_TTL
 legacyMappings.Add("salary", DB.Global.CreateFieldMapping("salary", "ANNUAL_SAL", False, Nothing))
 legacyMappings.Add("isActive", DB.Global.CreateFieldMapping("isActive", "ACTV_FLG", False, "Y"))
 
-Dim legacyWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim legacyWriter = DB.Global.CreateBusinessLogicForWriting(
     "EMP_MASTER",
     legacyMappings,
     New String() {"EMP_NO"},
@@ -311,7 +311,7 @@ Dim dynamicMappings = DB.Global.CreateFieldMappingsDictionary(
     defaults
 )
 
-Dim dynamicWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim dynamicWriter = DB.Global.CreateBusinessLogicForWriting(
     "CUSTOMERS",
     dynamicMappings,
     New String() {"CUST_ID"},
@@ -348,7 +348,7 @@ validatedMappings.Add("balance", DB.Global.CreateFieldMapping("balance", "BALANC
 ' Create custom validator for additional checks beyond field mappings
 Dim customValidator = DB.Global.CreateValidator(New String() {"accountId", "accountType"})
 
-Dim validatedWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim validatedWriter = DB.Global.CreateBusinessLogicForWriting(
     "ACCOUNTS",
     validatedMappings,
     New String() {"ACCT_ID"},
@@ -387,7 +387,7 @@ strictMappings.Add("amount", DB.Global.CreateFieldMapping("amount", "TXN_AMT", T
 strictMappings.Add("currency", DB.Global.CreateFieldMapping("currency", "CURRENCY_CODE", False, "USD"))
 strictMappings.Add("timestamp", DB.Global.CreateFieldMapping("timestamp", "TXN_TIMESTAMP", True, Nothing))
 
-Dim strictWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim strictWriter = DB.Global.CreateBusinessLogicForWriting(
     "TRANSACTIONS",
     strictMappings,
     New String() {"TXN_ID"},
@@ -442,7 +442,7 @@ ElseIf apiVersion = "v2" Then
     versionedMappings.Add("displayName", DB.Global.CreateFieldMapping("displayName", "DISPLAY_NAME", False, Nothing))
 End If
 
-Dim versionedWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim versionedWriter = DB.Global.CreateBusinessLogicForWriting(
     "USERS",
     versionedMappings,
     New String() {"USER_ID"},
@@ -483,7 +483,7 @@ auditMappings.Add("createdDate", DB.Global.CreateFieldMapping("createdDate", "CR
 auditMappings.Add("modifiedBy", DB.Global.CreateFieldMapping("modifiedBy", "MODIFIED_BY", False, "SYSTEM"))
 auditMappings.Add("modifiedDate", DB.Global.CreateFieldMapping("modifiedDate", "MODIFIED_DT", False, DateTime.Now))
 
-Dim auditWriter = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim auditWriter = DB.Global.CreateBusinessLogicForWriting(
     "AUDITED_RECORDS",
     auditMappings,
     New String() {"RECORD_ID"},

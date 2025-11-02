@@ -15,11 +15,16 @@ If PayloadError IsNot Nothing Then
     Return PayloadError
 End If
 
+' Define search conditions
+Dim secureConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+secureConditions.Add("RecordId", DB.Global.CreateParameterCondition("RecordId", "RecordId = :RecordId", Nothing))
+secureConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
+
+' NOTE: Exclude sensitive fields in your SQL SELECT statement explicitly
+' e.g., SELECT RecordId, UserId, Name FROM SensitiveData (do NOT include SSN, CreditCard, Password)
 Dim secureLogic = DB.Global.CreateBusinessLogicForReading(
-    "SensitiveData",
-    New String() {"RecordId", "UserId"},
-    New String() {"SSN", "CreditCard", "Password"},  ' Always exclude sensitive fields
-    False
+    "SELECT RecordId, UserId, Name, Email FROM SensitiveData {WHERE}",
+    secureConditions
 )
 
 Return DB.Global.ProcessActionLink(
@@ -53,25 +58,18 @@ If PayloadError2 IsNot Nothing Then
     Return PayloadError2
 End If
 
-' Define sensitive fields to exclude
-Dim sensitiveFields = New String() {
-    "Password",
-    "PasswordHash",
-    "PasswordSalt",
-    "SSN",
-    "TaxID",
-    "CreditCardNumber",
-    "CVV",
-    "SecretAnswer",
-    "APIKey",
-    "RefreshToken"
-}
+' Define search conditions for profile
+Dim profileConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+profileConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
+profileConditions.Add("Email", DB.Global.CreateParameterCondition("Email", "Email = :Email", Nothing))
+profileConditions.Add("Phone", DB.Global.CreateParameterCondition("Phone", "Phone = :Phone", Nothing))
 
+' IMPORTANT: Explicitly exclude sensitive fields by NOT selecting them in SQL
+' Only select safe fields: UserId, Email, Name, Phone, Department, etc.
+' NEVER select: Password, PasswordHash, SSN, CreditCardNumber, CVV, APIKey, etc.
 Dim profileLogic = DB.Global.CreateBusinessLogicForReading(
-    "Users",
-    New String() {"UserId", "Email", "Phone"},
-    sensitiveFields,  ' Excluded from response
-    False
+    "SELECT UserId, Email, Name, Phone, Department, CreatedDate FROM Users {WHERE}",
+    profileConditions
 )
 
 Return DB.Global.ProcessActionLink(
@@ -93,11 +91,13 @@ If PayloadError3 IsNot Nothing Then
 End If
 
 ' This is SAFE - uses parameterized query
+Dim safeConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+safeConditions.Add("ProductName", DB.Global.CreateParameterCondition("ProductName", "ProductName LIKE :ProductName", Nothing))
+safeConditions.Add("Category", DB.Global.CreateParameterCondition("Category", "Category = :Category", Nothing))
+
 Dim safeLogic = DB.Global.CreateBusinessLogicForReading(
-    "Products",
-    New String() {"ProductName", "Category"},
-    Nothing,
-    True
+    "SELECT ProductId, ProductName, Category, Price, Description FROM Products {WHERE}",
+    safeConditions
 )
 
 Return DB.Global.ProcessActionLink(
@@ -139,11 +139,13 @@ If actionResult.Item1 Then
     End If
 End If
 
+Dim auditConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+auditConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
+auditConditions.Add("Action", DB.Global.CreateParameterCondition("Action", "Action = :Action", Nothing))
+
 Dim logic4 = DB.Global.CreateBusinessLogicForReading(
-    "AuditLog",
-    New String() {"UserId", "Action"},
-    Nothing,
-    False
+    "SELECT LogId, UserId, Action, Timestamp, IpAddress FROM AuditLog {WHERE} ORDER BY Timestamp DESC",
+    auditConditions
 )
 
 Return DB.Global.ProcessActionLink(
@@ -201,11 +203,9 @@ roleConditions.Add("Status", DB.Global.CreateParameterCondition(
 ))
 
 Dim roleBasedLogic = DB.Global.CreateBusinessLogicForReading(
-    "Orders SELECT * FROM Orders {WHERE} ORDER BY OrderDate DESC",
+    "SELECT OrderId, UserId, OrderDate, Status, TotalAmount FROM Orders {WHERE} ORDER BY OrderDate DESC",
     roleConditions,
-    Nothing,
-    $"UserId = '{userId}'",  ' Default: users see only their data
-    Nothing
+    $"UserId = '{userId}'"  ' Default: users see only their data
 )
 
 Return DB.Global.ProcessActionLink(
@@ -241,11 +241,12 @@ Dim logMessage = $"API Request from User: {userIdResult6.Item2} at {DateTime.Now
 DB.Global.LogCustom(DB, StringPayload6, "Request received", logMessage)
 
 ' Process the request
+Dim productConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+productConditions.Add("Category", DB.Global.CreateParameterCondition("Category", "Category = :Category", Nothing))
+
 Dim logic6 = DB.Global.CreateBusinessLogicForReading(
-    "Products",
-    New String() {"Category"},
-    Nothing,
-    False
+    "SELECT ProductId, ProductName, Category, Price, Stock FROM Products {WHERE}",
+    productConditions
 )
 
 Dim result6 = DB.Global.ProcessActionLink(
@@ -288,11 +289,17 @@ If userRoleResult7.Item2.ToUpper() <> "ADMIN" AndAlso targetUserIdResult.Item2 <
     Return DB.Global.CreateErrorResponse("Unauthorized: You can only update your own profile")
 End If
 
-' Proceed with update
-Dim updateableFields = New String() {"UserId", "Email", "Phone", "Address"}
+' Proceed with update - create field mappings
+Dim updateMappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"UserId", "Email", "Phone", "Address"},
+    New String() {"UserId", "Email", "Phone", "Address"},
+    New Boolean() {True, False, False, False},
+    New Object() {Nothing, Nothing, Nothing, Nothing}
+)
+
 Dim updateLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
-    updateableFields,
+    updateMappings,
     New String() {"UserId"},
     True
 )
@@ -330,7 +337,7 @@ safeUpdateMappings.Add("avatarUrl", DB.Global.CreateFieldMapping("avatarUrl", "A
 ' Sensitive fields are NOT in the mapping, so they can't be updated through this endpoint:
 ' - IsAdmin, AccountBalance, PasswordHash, Email (require separate verified endpoints)
 
-Dim safeUpdateLogic = DB.Global.CreateAdvancedBusinessLogicForWriting(
+Dim safeUpdateLogic = DB.Global.CreateBusinessLogicForWriting(
     "USER_PROFILES",
     safeUpdateMappings,
     New String() {"USER_ID"},
@@ -388,10 +395,17 @@ If recordsResult.Item1 Then
     Next
 End If
 
-' Proceed with batch operation
-Dim batchLogic9 = DB.Global.CreateBusinessLogicForWritingBatch(
-    "UserNotes",
+' Proceed with batch operation - create field mappings
+Dim noteMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"NoteId", "UserId", "Title", "Content"},
+    New String() {"NoteId", "UserId", "Title", "Content"},
+    New Boolean() {True, True, False, False},
+    New Object() {Nothing, Nothing, Nothing, Nothing}
+)
+
+Dim batchLogic9 = DB.Global.CreateBusinessLogicForBatchWriting(
+    "UserNotes",
+    noteMappings,
     New String() {"NoteId"},
     True
 )
@@ -453,9 +467,7 @@ secureMappings.Add("title", DB.Global.CreateFieldMapping("title", "TITLE", False
 secureMappings.Add("description", DB.Global.CreateFieldMapping("description", "DESCRIPTION", False, Nothing))
 ' Note: Sensitive fields like OwnerId, IsPublic, Permissions NOT included
 
-' 7. ✓ Exclude sensitive fields from responses
-Dim excludeFields = New String() {"PasswordHash", "ApiKey", "InternalNotes"}
-
+' 7. ✓ Exclude sensitive fields from SQL SELECT (do not include PasswordHash, ApiKey, InternalNotes)
 ' 8. ✓ Add row-level security with WHERE clause
 Dim securityConditions As New System.Collections.Generic.Dictionary(Of String, Object)
 securityConditions.Add("resourceId", DB.Global.CreateParameterCondition(
@@ -472,11 +484,10 @@ Else
     defaultWhere = $"OWNER_ID = '{authUserId.Item2}' AND IS_DELETED = 0"  ' Users see only their own
 End If
 
-' 9. ✓ Create secure business logic
+' 9. ✓ Create secure business logic - explicitly select only safe fields
 Dim secureLogic10 = DB.Global.CreateBusinessLogicForReading(
-    "SELECT * FROM RESOURCES {WHERE} ORDER BY CREATED_DATE DESC",
+    "SELECT RESOURCE_ID, TITLE, DESCRIPTION, CREATED_DATE, OWNER_ID FROM RESOURCES {WHERE} ORDER BY CREATED_DATE DESC",
     securityConditions,
-    excludeFields,
     defaultWhere,
     secureMappings
 )
