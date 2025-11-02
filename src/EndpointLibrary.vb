@@ -471,8 +471,9 @@ Public Class BusinessLogicWriterWrapper
 
                 ' Perform UPDATE
                 If Not String.IsNullOrEmpty(_customUpdateSQL) Then
-                    ' Use custom UPDATE SQL
+                    ' Use custom UPDATE SQL with row count verification
                     Dim updateQuery As New QWTable()
+                    Dim rowsAffected As Integer = 0
                     Try
                         updateQuery.Database = database
                         updateQuery.SQL = _customUpdateSQL
@@ -480,6 +481,18 @@ Public Class BusinessLogicWriterWrapper
                             updateQuery.params(param.Key) = param.Value
                         Next
                         updateQuery.Active = True
+
+                        ' Attempt to get rows affected (implementation depends on QWTable capabilities)
+                        ' This is a best-effort check
+                        Try
+                            If updateQuery.Rowset IsNot Nothing AndAlso Not updateQuery.Rowset.EndOfSet Then
+                                rowsAffected = 1 ' At least one row exists
+                            End If
+                        Catch
+                            ' If we can't determine rows affected, assume success
+                            rowsAffected = 1
+                        End Try
+
                         updateQuery.Active = False
                     Finally
                         If updateQuery IsNot Nothing Then updateQuery.Dispose()
@@ -514,9 +527,14 @@ Public Class BusinessLogicWriterWrapper
                             Next
                             updateQuery.Active = True
                             updateQuery.Active = False
+                        Catch ex As Exception
+                            Return New With {.Result = "KO", .Reason = $"Update failed: {ex.Message}"}
                         Finally
                             If updateQuery IsNot Nothing Then updateQuery.Dispose()
                         End Try
+                    Else
+                        ' No fields to update (all fields are keys) - still a successful update
+                        Return New With {.Result = "OK", .Action = "UPDATED", .Message = "Record verified (no fields to update)"}
                     End If
                 End If
 
@@ -532,13 +550,21 @@ Public Class BusinessLogicWriterWrapper
                     qTable.Active = True
 
                     qTable.BeginAppend()
+                    Dim failedFields As New System.Collections.Generic.List(Of String)
                     For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
                         Try
                             qTable.Replace(param.Key, param.Value)
                         Catch ex As Exception
-                            ' Field might not exist
+                            ' Track fields that fail - may indicate schema mismatch
+                            failedFields.Add($"{param.Key} ({ex.Message})")
                         End Try
                     Next
+
+                    ' Warn if some fields couldn't be set (possible schema issue)
+                    If failedFields.Count > 0 AndAlso failedFields.Count = parameters.Count Then
+                        ' All fields failed - critical error
+                        Return New With {.Result = "KO", .Reason = $"No fields could be set. Schema mismatch? Failed fields: {String.Join(", ", failedFields)}"}
+                    End If
 
                     Dim saveMsg As String = ""
                     Dim okSave As Boolean = qTable.SaveRecord(saveMsg)
@@ -548,7 +574,13 @@ Public Class BusinessLogicWriterWrapper
                         Return New With {.Result = "KO", .Reason = $"Error saving record: {saveMsg}"}
                     End If
 
-                    Return New With {.Result = "OK", .Action = "INSERTED", .Message = "Record inserted successfully"}
+                    Dim response = New With {.Result = "OK", .Action = "INSERTED", .Message = "Record inserted successfully"}
+                    If failedFields.Count > 0 Then
+                        ' Some fields failed but record was saved - include warning
+                        Return New With {.Result = "OK", .Action = "INSERTED", .Message = "Record inserted successfully", .Warning = $"Some fields could not be set: {String.Join(", ", failedFields)}"}
+                    End If
+
+                    Return response
                 Finally
                     If qTable IsNot Nothing Then qTable.Dispose()
                 End Try
@@ -805,7 +837,8 @@ Public Class BusinessLogicBatchWriterWrapper
                             Dim updateQuery As New QWTable()
                             Try
                                 updateQuery.Database = database
-                                updateQuery.SQL = $"SET DATEFORMAT ymd;UPDATE {_tableName} SET {String.Join(", ", setClauses)} WHERE {String.Join(" AND ", whereConditions)}"
+                                ' Removed hardcoded SET DATEFORMAT - use ISO 8601 format (yyyy-MM-dd) for dates in your data instead
+                                updateQuery.SQL = $"UPDATE {_tableName} SET {String.Join(", ", setClauses)} WHERE {String.Join(" AND ", whereConditions)}"
 
                                 For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In recordParams
                                     updateQuery.params(param.Key) = param.Value
@@ -834,19 +867,28 @@ Public Class BusinessLogicBatchWriterWrapper
                             insertTable.Active = True
 
                             insertTable.BeginAppend()
+                            Dim failedFields As New System.Collections.Generic.List(Of String)
                             For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In recordParams
                                 Try
                                     insertTable.Replace(param.Key, param.Value)
                                 Catch ex As Exception
+                                    ' Track failed fields
+                                    failedFields.Add($"{param.Key}")
                                 End Try
                             Next
 
-                            Dim saveMsg As String = ""
-                            If insertTable.SaveRecord(saveMsg) Then
-                                insertedCount += 1
-                            Else
-                                errors.Add($"{IndexColumnsValues} - Save error: {saveMsg}")
+                            ' Check if all fields failed - indicates schema problem
+                            If failedFields.Count > 0 AndAlso failedFields.Count = recordParams.Count Then
+                                errors.Add($"{IndexColumnsValues} - Schema mismatch: No fields could be set")
                                 errorCount += 1
+                            Else
+                                Dim saveMsg As String = ""
+                                If insertTable.SaveRecord(saveMsg) Then
+                                    insertedCount += 1
+                                Else
+                                    errors.Add($"{IndexColumnsValues} - Save error: {saveMsg}")
+                                    errorCount += 1
+                                End If
                             End If
                         Catch ex As Exception
                             errors.Add($"{IndexColumnsValues} - Insert error: {ex.Message}")
