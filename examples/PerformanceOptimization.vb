@@ -335,4 +335,239 @@ End Function
 ' - FOR JSON PATH: 180-220ms
 ' - Improvement: 56-60%
 
+' ===================================
+' EXAMPLE 8: HANDLING EDGE CASES WITH FOR JSON PATH
+' Demonstrates automatic fallback and manual escaping for problematic data
+' ===================================
+
+' Scenario 1: Automatic Fallback (Recommended)
+' The library automatically falls back to standard mode if FOR JSON PATH fails
+Public Function Example8_AutomaticFallback() As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
+
+    ' This query might have columns with special characters (quotes, newlines, etc.)
+    Dim baseSQL As String = "SELECT DocumentId, Title, Description, Notes FROM Documents {WHERE}"
+
+    Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
+        New String() {"DocumentId", "Title"},
+        New String() {
+            "DocumentId = :DocumentId",
+            "Title LIKE :Title"
+        }
+    )
+
+    ' ROBUST: If Description or Notes contain unescaped characters (quotes, newlines),
+    ' the library will automatically:
+    ' 1. Try FOR JSON PATH first (fast)
+    ' 2. If JSON parsing fails, automatically retry with standard Dictionary mode
+    ' 3. Return results with a "FallbackReason" field explaining what happened
+
+    Return DB.Global.CreateBusinessLogicForReading(
+        baseSQL,
+        searchConditions,
+        Nothing,
+        Nothing,
+        True  ' Use FOR JSON PATH with automatic fallback
+    )
+
+    ' Response when fallback occurs:
+    ' {
+    '   "Result": "OK",
+    '   "Records": [...],
+    '   "PerformanceMode": "Standard (FOR JSON PATH failed - data contains special characters)",
+    '   "FallbackReason": "JSON parsing error: Unterminated string..."
+    ' }
+End Function
+
+' Scenario 2: Manual SQL-Level Escaping (Advanced)
+' Use helper functions to escape problematic columns at SQL level
+Public Function Example8_ManualEscaping() As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
+
+    ' Build safe column list - automatically escapes text columns
+    Dim safeColumns As String = DB.Global.BuildSafeColumnList(
+        New String() {"DocumentId", "Title", "Description", "Notes", "CreatedDate"},
+        New String() {"Description", "Notes"}  ' These columns will be escaped
+    )
+
+    ' The SQL will look like:
+    ' SELECT DocumentId, Title,
+    '        REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS Description,
+    '        REPLACE(REPLACE(REPLACE(Notes, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS Notes,
+    '        CreatedDate
+    ' FROM Documents {WHERE}
+
+    Dim baseSQL As String = $"SELECT {safeColumns} FROM Documents {{WHERE}}"
+
+    Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
+        New String() {"DocumentId"},
+        New String() {"DocumentId = :DocumentId"}
+    )
+
+    ' Now FOR JSON PATH will work reliably because problematic characters are removed
+    Return DB.Global.CreateBusinessLogicForReading(
+        baseSQL,
+        searchConditions,
+        Nothing,
+        Nothing,
+        True  ' Safe to use FOR JSON PATH
+    )
+End Function
+
+' Scenario 3: Escape Individual Columns
+' More granular control over escaping
+Public Function Example8_EscapeIndividualColumns() As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
+
+    ' Manually escape specific columns
+    Dim escapedDescription As String = DB.Global.EscapeColumnForJson("Description")
+    Dim escapedNotes As String = DB.Global.EscapeColumnForJson("Notes")
+
+    Dim baseSQL As String = $"SELECT
+        DocumentId,
+        Title,
+        {escapedDescription},
+        {escapedNotes},
+        CreatedDate
+    FROM Documents {{WHERE}}"
+
+    Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
+        New String() {"DocumentId"},
+        New String() {"DocumentId = :DocumentId"}
+    )
+
+    Return DB.Global.CreateBusinessLogicForReading(
+        baseSQL,
+        searchConditions,
+        Nothing,
+        Nothing,
+        True  ' FOR JSON PATH with escaped columns
+    )
+End Function
+
+' Scenario 4: Best Practice Recommendation
+' Let automatic fallback handle edge cases - it's the most robust approach
+Public Function Example8_BestPractice() As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
+
+    ' BEST PRACTICE:
+    ' 1. Use explicit column lists (not SELECT *)
+    ' 2. Enable FOR JSON PATH for performance
+    ' 3. Let automatic fallback handle edge cases
+    ' 4. Monitor "FallbackReason" in responses to identify problematic data
+
+    Dim baseSQL As String = "SELECT
+        DocumentId,
+        tipo,
+        numero,
+        DATA_PUBBL,
+        FLAG1,
+        FLAG2,
+        FLAG3,
+        FLAG4,
+        FLAG5,
+        FLAG6,
+        FLAG7,
+        FLAG8
+    FROM document {WHERE} ORDER BY DATA_PUBBL DESC"
+
+    Dim searchConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+
+    searchConditions.Add("tipo", DB.Global.CreateParameterCondition(
+        "tipo",
+        "tipo like :tipo",
+        Nothing
+    ))
+
+    searchConditions.Add("numero", DB.Global.CreateParameterCondition(
+        "numero",
+        "numero = :numero",
+        Nothing
+    ))
+
+    searchConditions.Add("minDtPubbl", DB.Global.CreateParameterCondition(
+        "minDtPubbl",
+        "DATA_PUBBL >= :minDtPubbl",
+        Nothing
+    ))
+
+    searchConditions.Add("maxDtPubbl", DB.Global.CreateParameterCondition(
+        "maxDtPubbl",
+        "DATA_PUBBL <= :maxDtPubbl",
+        Nothing
+    ))
+
+    ' This will:
+    ' - Try FOR JSON PATH first for best performance
+    ' - Automatically fallback to standard mode if data has special characters
+    ' - Always return valid results
+    Return DB.Global.CreateBusinessLogicForReading(
+        baseSQL,
+        searchConditions,
+        "1=0",  ' Prevent returning all records when no filters provided
+        Nothing,
+        True  ' Use FOR JSON PATH with automatic fallback - RECOMMENDED!
+    )
+End Function
+
+' ===================================
+' EDGE CASES HANDLED BY THE LIBRARY
+' ===================================
+
+' The library now handles these edge cases automatically:
+'
+' 1. UNESCAPED QUOTES
+'    Data: He said "Hello"
+'    Solution: Automatic fallback to standard mode
+'
+' 2. NEWLINES AND CARRIAGE RETURNS
+'    Data: Line1\r\nLine2
+'    Solution: Automatic fallback OR use BuildSafeColumnList
+'
+' 3. TAB CHARACTERS
+'    Data: Column1\tColumn2
+'    Solution: Automatic fallback OR use BuildSafeColumnList
+'
+' 4. BACKSLASHES
+'    Data: C:\Windows\System32
+'    Solution: SQL Server handles these correctly
+'
+' 5. NULL VALUES
+'    Data: NULL
+'    Solution: SQL Server FOR JSON PATH handles NULLs correctly
+'
+' 6. EMPTY STRINGS
+'    Data: ""
+'    Solution: SQL Server FOR JSON PATH handles empty strings correctly
+'
+' 7. VERY LARGE TEXT FIELDS
+'    Data: 10,000+ character strings
+'    Solution: Both modes handle large strings (may be slow)
+'
+' 8. BINARY DATA
+'    Data: Binary columns
+'    Solution: SQL Server encodes as Base64 in FOR JSON PATH
+'
+' 9. SPECIAL UTF-8 CHARACTERS
+'    Data: Emoji, Chinese characters, etc.
+'    Solution: SQL Server handles UTF-8 correctly
+'
+' 10. MALFORMED JSON FROM SQL SERVER
+'     Data: SQL Server generates invalid JSON
+'     Solution: Automatic fallback to standard mode with detailed error message
+
+' ===================================
+' MONITORING FALLBACK BEHAVIOR
+' ===================================
+
+' When automatic fallback occurs, the response includes:
+' {
+'   "Result": "OK",
+'   "Records": [...],
+'   "PerformanceMode": "Standard (FOR JSON PATH failed - data contains special characters)",
+'   "FallbackReason": "JSON parsing error: Unterminated string. Expected delimiter: \". Path '[0].FLAG8', line 1, position 2033."
+' }
+'
+' Monitor these fields to identify which queries/data are causing fallback
+' Then you can:
+' 1. Clean the data in the database
+' 2. Use BuildSafeColumnList to escape problematic columns
+' 3. Or just accept the automatic fallback (still returns correct results)
+
 '
