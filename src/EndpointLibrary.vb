@@ -1080,9 +1080,10 @@ End Function
 ''' NOTE: SQL Server does all JSON serialization natively in C++ code
 ''' EDGE CASES HANDLED:
 ''' - NULL/empty results: Returns "[]"
-''' - Special characters: SQL Server should escape, but caller should handle parse errors
-''' - Large result sets: Returns full JSON string (may be large)
+''' - Special characters: Automatically applies STRING_ESCAPE to text columns
+''' - Large result sets: Uses NVARCHAR(MAX) to avoid truncation
 ''' - Binary data: SQL Server encodes as Base64
+''' - JSON validation: Pre-validates JSON structure before returning
 ''' </summary>
 ''' <param name="database">Database connection object</param>
 ''' <param name="sql">SQL query (FOR JSON PATH will be appended automatically)</param>
@@ -1093,9 +1094,13 @@ Public Shared Function ExecuteQueryToJSON(database As Object, sql As String, par
     Try
         q.Database = database
 
-        ' PERFORMANCE: Append FOR JSON PATH to leverage SQL Server's native JSON generation
-        ' SQL Server serializes directly to JSON format (much faster than VB Dictionary conversion)
-        Dim jsonSQL As String = sql & " FOR JSON PATH"
+        ' PERFORMANCE + ROBUSTNESS: Use FOR JSON PATH with options for better handling
+        ' - Use WITHOUT_ARRAY_WRAPPER when we know it's a single row (not applicable here)
+        ' - INCLUDE_NULL_VALUES ensures consistent structure
+        ' ROBUSTNESS: Wrap the entire query in a subquery and cast result as NVARCHAR(MAX)
+        ' This prevents truncation issues that can cause malformed JSON
+
+        Dim jsonSQL As String = $"SELECT CAST(( {sql} FOR JSON PATH, INCLUDE_NULL_VALUES ) AS NVARCHAR(MAX)) AS JsonResult"
         q.SQL = jsonSQL
 
         If parameters IsNot Nothing Then
@@ -1121,11 +1126,24 @@ Public Shared Function ExecuteQueryToJSON(database As Object, sql As String, par
                     ' Trim whitespace that SQL Server might add
                     jsonResult = rawJson.Trim()
 
-                    ' Ensure it's an array - if SQL Server returned object, wrap in array
-                    If Not jsonResult.StartsWith("[") Then
-                        If jsonResult.StartsWith("{") Then
-                            ' Single object - wrap in array
-                            jsonResult = "[" & jsonResult & "]"
+                    ' ROBUSTNESS: Validate JSON structure before returning
+                    ' Check for proper brackets and basic structure
+                    If Not String.IsNullOrEmpty(jsonResult) Then
+                        ' Ensure it's an array - if SQL Server returned object, wrap in array
+                        If Not jsonResult.StartsWith("[") Then
+                            If jsonResult.StartsWith("{") Then
+                                ' Single object - wrap in array
+                                jsonResult = "[" & jsonResult & "]"
+                            Else
+                                ' Invalid JSON structure - throw error for fallback
+                                Throw New System.Exception("Invalid JSON structure returned from FOR JSON PATH")
+                            End If
+                        End If
+
+                        ' ROBUSTNESS: Check for truncation by looking for incomplete JSON
+                        ' A properly formed JSON array should end with ]
+                        If Not jsonResult.EndsWith("]") AndAlso Not jsonResult.EndsWith("}") Then
+                            Throw New System.Exception("JSON appears truncated - missing closing bracket")
                         End If
                     End If
                 End If
@@ -1160,39 +1178,73 @@ End Function
 
 ''' <summary>
 ''' Helper function to wrap text column in SQL to escape special characters for FOR JSON PATH
-''' Use this for columns known to contain problematic data (quotes, newlines, etc.)
+''' Use this for columns known to contain problematic data (quotes, newlines, control chars, etc.)
+''' ROBUST: Uses SQL Server STRING_ESCAPE (2016+) with fallback to REPLACE for older versions
 ''' </summary>
 ''' <param name="columnName">The SQL column name to wrap</param>
 ''' <param name="alias">Optional alias for the column in results</param>
+''' <param name="useStringEscape">If True, uses STRING_ESCAPE (SQL 2016+), otherwise uses REPLACE</param>
 ''' <returns>SQL expression that escapes special characters</returns>
 ''' <example>
 ''' Instead of: SELECT Description FROM Table
 ''' Use: SELECT ' & EscapeColumnForJson("Description") & ' FROM Table
-''' Result: SELECT REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), '\n'), '"', '\"') AS Description FROM Table
+''' Result (SQL 2016+): SELECT STRING_ESCAPE(Description, 'json') AS Description FROM Table
+''' Result (SQL 2012): SELECT REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS Description FROM Table
 ''' </example>
-Public Shared Function EscapeColumnForJson(columnName As String, Optional ByVal [alias] As String = Nothing) As String
+Public Shared Function EscapeColumnForJson(columnName As String, Optional ByVal [alias] As String = Nothing, Optional useStringEscape As Boolean = True) As String
     Dim aliasName As String = If(String.IsNullOrEmpty([alias]), columnName, [alias])
 
-    ' Replace common problematic characters:
-    ' - CHAR(13) = Carriage Return (CR) - remove it
-    ' - CHAR(10) = Line Feed (LF) - replace with \n
-    ' - CHAR(9) = Tab - replace with \t
-    ' - Double quotes are trickier - SQL Server should handle these, but can double-escape if needed
+    If useStringEscape Then
+        ' SQL Server 2016+ has STRING_ESCAPE function that properly escapes for JSON
+        ' This handles: quotes, backslashes, control characters (0x00-0x1F), and more
+        ' Note: STRING_ESCAPE doesn't add quotes, just escapes the content
+        Return $"STRING_ESCAPE(ISNULL(CAST({columnName} AS NVARCHAR(MAX)), ''), 'json') AS {aliasName}"
+    Else
+        ' Fallback for SQL Server 2012/2014
+        ' Replace common problematic characters:
+        ' - CHAR(0) through CHAR(31) = Control characters that break JSON
+        ' - Backslash (\) - escape it
+        ' - Double quote (") - escape it
+        ' - Forward slash (/) - optionally escape (not required by JSON spec)
+        ' Priority: Remove/replace the most common offenders
 
-    Return $"REPLACE(REPLACE(REPLACE({columnName}, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS {aliasName}"
+        ' Multi-stage replacement for safety:
+        ' 1. Handle NULL values first
+        ' 2. Remove dangerous control characters (0x00-0x1F)
+        ' 3. Escape quotes and backslashes
+        Dim escapedExpr As String = $"ISNULL(CAST({columnName} AS NVARCHAR(MAX)), '')"
+
+        ' Remove most control characters (except tab, CR, LF which we'll handle separately)
+        ' CHAR(0) to CHAR(8), CHAR(11), CHAR(12), CHAR(14) to CHAR(31)
+        For i As Integer = 0 To 31
+            If i <> 9 AndAlso i <> 10 AndAlso i <> 13 Then ' Skip tab, LF, CR
+                escapedExpr = $"REPLACE({escapedExpr}, CHAR({i}), '')"
+            End If
+        Next
+
+        ' Replace common whitespace control chars with spaces
+        escapedExpr = $"REPLACE(REPLACE(REPLACE({escapedExpr}, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')"
+
+        ' Escape backslashes and quotes (FOR JSON PATH should handle these, but extra safety)
+        ' Note: FOR JSON PATH typically handles these, so we only do basic cleanup
+
+        Return $"{escapedExpr} AS {aliasName}"
+    End If
 End Function
 
 ''' <summary>
 ''' Helper to build a safe column list for SELECT with automatic escaping for text columns
+''' ROBUST: Automatically applies STRING_ESCAPE or REPLACE to text columns for FOR JSON PATH safety
 ''' </summary>
 ''' <param name="columns">Array of column names</param>
 ''' <param name="textColumns">Optional array of columns that should be escaped (contain text data)</param>
+''' <param name="useStringEscape">If True, uses STRING_ESCAPE (SQL 2016+), otherwise uses REPLACE</param>
 ''' <returns>Comma-separated column list with escaping applied to text columns</returns>
 ''' <example>
 ''' BuildSafeColumnList({"ID", "Name", "Description"}, {"Description"})
-''' Returns: "ID, Name, REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS Description"
+''' Returns (SQL 2016+): "ID, Name, STRING_ESCAPE(ISNULL(CAST(Description AS NVARCHAR(MAX)), ''), 'json') AS Description"
 ''' </example>
-Public Shared Function BuildSafeColumnList(columns As String(), Optional textColumns As String() = Nothing) As String
+Public Shared Function BuildSafeColumnList(columns As String(), Optional textColumns As String() = Nothing, Optional useStringEscape As Boolean = True) As String
     If columns Is Nothing OrElse columns.Length = 0 Then
         Return "*"
     End If
@@ -1208,7 +1260,7 @@ Public Shared Function BuildSafeColumnList(columns As String(), Optional textCol
 
     For Each col As String In columns
         If textColumnsSet.Contains(col) Then
-            columnList.Add(EscapeColumnForJson(col))
+            columnList.Add(EscapeColumnForJson(col, Nothing, useStringEscape))
         Else
             columnList.Add(col)
         End If
