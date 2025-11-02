@@ -566,10 +566,10 @@ Private Shared Function BulkExistenceCheck(
         Dim queryParams As New System.Collections.Generic.Dictionary(Of String, Object)
         Dim paramIndex As Integer = 0
 
-        For Each recordParams In recordParameters
+        For Each recordParams As System.Collections.Generic.Dictionary(Of String, Object) In recordParameters
             Dim conditions As New System.Collections.Generic.List(Of String)(keyFields.Length)
 
-            For Each keyField In keyFields
+            For Each keyField As String In keyFields
                 If recordParams.ContainsKey(keyField) Then
                     Dim paramName As String = $"{keyField}_{paramIndex}"
                     conditions.Add($"{keyField} = :{paramName}")
@@ -596,7 +596,7 @@ Private Shared Function BulkExistenceCheck(
             checkQuery.Database = database
             checkQuery.SQL = sqlBuilder.ToString()
 
-            For Each param In queryParams
+            For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In queryParams
                 checkQuery.params(param.Key) = param.Value
             Next
 
@@ -606,7 +606,7 @@ Private Shared Function BulkExistenceCheck(
             ' Build composite keys from results
             While Not checkQuery.Rowset.EndOfSet
                 Dim compositeKey As New System.Text.StringBuilder()
-                For Each keyField In keyFields
+                For Each keyField As String In keyFields
                     If compositeKey.Length > 0 Then compositeKey.Append("|")
                     compositeKey.Append(checkQuery.Rowset.Fields(keyField).Value.ToString())
                 Next
@@ -634,7 +634,7 @@ End Function
 ''' </summary>
 Private Shared Function GetCompositeKey(recordParams As System.Collections.Generic.Dictionary(Of String, Object), keyFields As String()) As String
     Dim compositeKey As New System.Text.StringBuilder()
-    For Each keyField In keyFields
+    For Each keyField As String In keyFields
         If compositeKey.Length > 0 Then compositeKey.Append("|")
         If recordParams.ContainsKey(keyField) Then
             compositeKey.Append(recordParams(keyField).ToString())
