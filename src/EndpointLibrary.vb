@@ -1,9 +1,6 @@
-[Libraries]
-ENABLED=S
-NOME=Endpoint handling
-SCRIPT='
+
 ' Important: the users of this library cannot use classes and cannot use custom types defined here. Also all names must be full qualified names.
-===================================
+'===================================
 ' FLEXIBLE SQL WRAPPER SYSTEM
 ' High-performance endpoint library with optimized batch operations
 ' ===================================
@@ -1290,4 +1287,3 @@ Public Function CreateFieldMappingsDictionary(
 
     Return dict
 End Function
-
