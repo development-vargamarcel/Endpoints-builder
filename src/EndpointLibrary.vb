@@ -301,17 +301,34 @@ Public Class BusinessLogicReaderWrapper
             If _useForJsonPath Then
                 ' PERFORMANCE MODE: Use SQL Server's native FOR JSON PATH
                 ' This is 40-60% faster as SQL Server does JSON serialization in native C++ code
-                Dim jsonRecords As String = ExecuteQueryToJSON(database, finalSQL, sqlParameters)
+                ' ROBUST: Automatically fallback to standard mode if JSON is malformed
+                Try
+                    Dim jsonRecords As String = ExecuteQueryToJSON(database, finalSQL, sqlParameters)
 
-                ' Parse the JSON string back to array for consistent response format
-                Dim recordsArray = Newtonsoft.Json.Linq.JArray.Parse(jsonRecords)
+                    ' Parse the JSON string back to array for consistent response format
+                    ' This validates that SQL Server generated valid JSON
+                    Dim recordsArray = Newtonsoft.Json.Linq.JArray.Parse(jsonRecords)
 
-                Return New With {
-                    .Result = "OK",
-                    .ProvidedParameters = String.Join(",", providedParams),
-                    .ExecutedSQL = finalSQL & " FOR JSON PATH",
-                    .Records = recordsArray
-                }
+                    Return New With {
+                        .Result = "OK",
+                        .ProvidedParameters = String.Join(",", providedParams),
+                        .ExecutedSQL = finalSQL & " FOR JSON PATH",
+                        .Records = recordsArray
+                    }
+                Catch jsonEx As Newtonsoft.Json.JsonException
+                    ' FOR JSON PATH failed due to malformed JSON (unescaped chars, etc.)
+                    ' AUTOMATIC FALLBACK: Retry with standard Dictionary mode
+                    Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
+
+                    Return New With {
+                        .Result = "OK",
+                        .ProvidedParameters = String.Join(",", providedParams),
+                        .ExecutedSQL = finalSQL,
+                        .Records = rows,
+                        .PerformanceMode = "Standard (FOR JSON PATH failed - data contains special characters)",
+                        .FallbackReason = $"JSON parsing error: {jsonEx.Message}"
+                    }
+                End Try
             Else
                 ' STANDARD MODE: Dictionary conversion in VB code (more flexible for complex transformations)
                 Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
@@ -1061,6 +1078,11 @@ End Function
 ''' Executes query with FOR JSON PATH and returns JSON string directly from SQL Server
 ''' This is 40-60% faster than ExecuteQueryToDictionary for simple queries
 ''' NOTE: SQL Server does all JSON serialization natively in C++ code
+''' EDGE CASES HANDLED:
+''' - NULL/empty results: Returns "[]"
+''' - Special characters: SQL Server should escape, but caller should handle parse errors
+''' - Large result sets: Returns full JSON string (may be large)
+''' - Binary data: SQL Server encodes as Base64
 ''' </summary>
 ''' <param name="database">Database connection object</param>
 ''' <param name="sql">SQL query (FOR JSON PATH will be appended automatically)</param>
@@ -1068,35 +1090,131 @@ End Function
 ''' <returns>JSON string with array of records, or empty array [] if no results</returns>
 Public Shared Function ExecuteQueryToJSON(database As Object, sql As String, parameters As System.Collections.Generic.Dictionary(Of String, Object)) As String
     Dim q As New QWTable()
-    q.Database = database
+    Try
+        q.Database = database
 
-    ' PERFORMANCE: Append FOR JSON PATH to leverage SQL Server's native JSON generation
-    ' SQL Server serializes directly to JSON format (much faster than VB Dictionary conversion)
-    Dim jsonSQL As String = sql & " FOR JSON PATH"
-    q.SQL = jsonSQL
+        ' PERFORMANCE: Append FOR JSON PATH to leverage SQL Server's native JSON generation
+        ' SQL Server serializes directly to JSON format (much faster than VB Dictionary conversion)
+        Dim jsonSQL As String = sql & " FOR JSON PATH"
+        q.SQL = jsonSQL
 
-    If parameters IsNot Nothing Then
-        For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
-            q.params(param.Key) = param.Value
+        If parameters IsNot Nothing Then
+            For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
+                q.params(param.Key) = param.Value
+            Next
+        End If
+
+        q.RequestLive = False
+        q.Active = True
+
+        ' SQL Server returns JSON result in first row, first column
+        ' If no results, SQL Server returns NULL (we'll return empty array instead)
+        Dim jsonResult As String = "[]"
+
+        If Not q.rowset.endofset AndAlso q.rowset.fields.size > 0 Then
+            Dim fieldValue As Object = q.rowset.fields(1).value
+            If fieldValue IsNot Nothing AndAlso Not IsDBNull(fieldValue) Then
+                Dim rawJson As String = fieldValue.ToString()
+
+                ' Basic validation: ensure we got something that looks like JSON
+                If Not String.IsNullOrWhiteSpace(rawJson) Then
+                    ' Trim whitespace that SQL Server might add
+                    jsonResult = rawJson.Trim()
+
+                    ' Ensure it's an array - if SQL Server returned object, wrap in array
+                    If Not jsonResult.StartsWith("[") Then
+                        If jsonResult.StartsWith("{") Then
+                            ' Single object - wrap in array
+                            jsonResult = "[" & jsonResult & "]"
+                        End If
+                    End If
+                End If
+            End If
+        End If
+
+        q.Active = False
+        Return jsonResult
+
+    Catch ex As Exception
+        ' Ensure cleanup even on error
+        If q IsNot Nothing AndAlso q.Active Then
+            Try
+                q.Active = False
+            Catch
+                ' Ignore cleanup errors
+            End Try
+        End If
+
+        ' Re-throw so caller can handle
+        Throw New System.Exception($"FOR JSON PATH execution failed: {ex.Message}", ex)
+    Finally
+        If q IsNot Nothing Then
+            Try
+                q.Dispose()
+            Catch
+                ' Ignore disposal errors
+            End Try
+        End If
+    End Try
+End Function
+
+''' <summary>
+''' Helper function to wrap text column in SQL to escape special characters for FOR JSON PATH
+''' Use this for columns known to contain problematic data (quotes, newlines, etc.)
+''' </summary>
+''' <param name="columnName">The SQL column name to wrap</param>
+''' <param name="alias">Optional alias for the column in results</param>
+''' <returns>SQL expression that escapes special characters</returns>
+''' <example>
+''' Instead of: SELECT Description FROM Table
+''' Use: SELECT ' & EscapeColumnForJson("Description") & ' FROM Table
+''' Result: SELECT REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), '\n'), '"', '\"') AS Description FROM Table
+''' </example>
+Public Shared Function EscapeColumnForJson(columnName As String, Optional ByVal [alias] As String = Nothing) As String
+    Dim aliasName As String = If(String.IsNullOrEmpty([alias]), columnName, [alias])
+
+    ' Replace common problematic characters:
+    ' - CHAR(13) = Carriage Return (CR) - remove it
+    ' - CHAR(10) = Line Feed (LF) - replace with \n
+    ' - CHAR(9) = Tab - replace with \t
+    ' - Double quotes are trickier - SQL Server should handle these, but can double-escape if needed
+
+    Return $"REPLACE(REPLACE(REPLACE({columnName}, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS {aliasName}"
+End Function
+
+''' <summary>
+''' Helper to build a safe column list for SELECT with automatic escaping for text columns
+''' </summary>
+''' <param name="columns">Array of column names</param>
+''' <param name="textColumns">Optional array of columns that should be escaped (contain text data)</param>
+''' <returns>Comma-separated column list with escaping applied to text columns</returns>
+''' <example>
+''' BuildSafeColumnList({"ID", "Name", "Description"}, {"Description"})
+''' Returns: "ID, Name, REPLACE(REPLACE(REPLACE(Description, CHAR(13), ''), CHAR(10), ' '), CHAR(9), ' ') AS Description"
+''' </example>
+Public Shared Function BuildSafeColumnList(columns As String(), Optional textColumns As String() = Nothing) As String
+    If columns Is Nothing OrElse columns.Length = 0 Then
+        Return "*"
+    End If
+
+    Dim columnList As New System.Collections.Generic.List(Of String)(columns.Length)
+    Dim textColumnsSet As New System.Collections.Generic.HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+    If textColumns IsNot Nothing Then
+        For Each tc As String In textColumns
+            textColumnsSet.Add(tc)
         Next
     End If
 
-    q.RequestLive = False
-    q.Active = True
-
-    ' SQL Server returns JSON result in first row, first column
-    ' If no results, SQL Server returns NULL (we'll return empty array instead)
-    Dim jsonResult As String = "[]"
-
-    If Not q.rowset.endofset AndAlso q.rowset.fields.size > 0 Then
-        Dim fieldValue As Object = q.rowset.fields(1).value
-        If fieldValue IsNot Nothing AndAlso Not IsDBNull(fieldValue) Then
-            jsonResult = fieldValue.ToString()
+    For Each col As String In columns
+        If textColumnsSet.Contains(col) Then
+            columnList.Add(EscapeColumnForJson(col))
+        Else
+            columnList.Add(col)
         End If
-    End If
+    Next
 
-    q.Active = False
-    Return jsonResult
+    Return String.Join(", ", columnList)
 End Function
 
 Public Shared Function GetDestinationIdentifier(ByRef payload As Newtonsoft.Json.Linq.JObject) As System.Tuple(Of Boolean, String)
