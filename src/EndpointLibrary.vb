@@ -33,12 +33,14 @@ Public Class FieldMapping
     Public Property JsonProperty As String
     Public Property SqlColumn As String
     Public Property IsRequired As Boolean
+    Public Property IsPrimaryKey As Boolean
     Public Property DefaultValue As Object
 
-    Public Sub New(jsonProp As String, sqlCol As String, Optional isRequired As Boolean = False, Optional defaultVal As Object = Nothing)
+    Public Sub New(jsonProp As String, sqlCol As String, Optional isRequired As Boolean = False, Optional isPrimaryKey As Boolean = False, Optional defaultVal As Object = Nothing)
         Me.JsonProperty = jsonProp
         Me.SqlColumn = sqlCol
         Me.IsRequired = isRequired
+        Me.IsPrimaryKey = isPrimaryKey
         Me.DefaultValue = defaultVal
     End Sub
 End Class
@@ -381,7 +383,7 @@ Public Class BusinessLogicWriterWrapper
     ''' </summary>
     ''' <param name="tableName">Table name for operations</param>
     ''' <param name="fieldMappings">Dictionary of field mappings (JSON to SQL)</param>
-    ''' <param name="keyFields">Fields that constitute the record key</param>
+    ''' <param name="keyFields">Fields that constitute the record key (optional - if Nothing, will extract from IsPrimaryKey in fieldMappings)</param>
     ''' <param name="allowUpdates">Whether to allow updates to existing records</param>
     ''' <param name="customExistenceCheckSQL">Custom SQL for checking existence (use :ParamName for parameters)</param>
     ''' <param name="customUpdateSQL">Custom UPDATE SQL (use :ParamName for parameters)</param>
@@ -395,11 +397,28 @@ Public Class BusinessLogicWriterWrapper
                    Optional customWhereClause As String = Nothing)
         _tableName = tableName
         _fieldMappings = fieldMappings
-        _keyFields = keyFields
         _allowUpdates = allowUpdates
         _customExistenceCheckSQL = customExistenceCheckSQL
         _customUpdateSQL = customUpdateSQL
         _customWhereClause = customWhereClause
+
+        ' Extract primary keys from field mappings if not explicitly provided
+        If keyFields Is Nothing OrElse keyFields.Length = 0 Then
+            Dim primaryKeys As New System.Collections.Generic.List(Of String)
+            For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In fieldMappings
+                If kvp.Value.IsPrimaryKey Then
+                    primaryKeys.Add(kvp.Value.SqlColumn)
+                End If
+            Next
+
+            If primaryKeys.Count = 0 Then
+                Throw New System.ArgumentException("No primary keys specified. Either provide keyFields parameter or mark fields with IsPrimaryKey=True in fieldMappings.")
+            End If
+
+            _keyFields = primaryKeys.ToArray()
+        Else
+            _keyFields = keyFields
+        End If
     End Sub
 
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
@@ -720,8 +739,25 @@ Public Class BusinessLogicBatchWriterWrapper
     Public Sub New(tableName As String, fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping), keyFields As String(), allowUpdates As Boolean)
         _tableName = tableName
         _fieldMappings = fieldMappings
-        _keyFields = keyFields
         _allowUpdates = allowUpdates
+
+        ' Extract primary keys from field mappings if not explicitly provided
+        If keyFields Is Nothing OrElse keyFields.Length = 0 Then
+            Dim primaryKeys As New System.Collections.Generic.List(Of String)
+            For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In fieldMappings
+                If kvp.Value.IsPrimaryKey Then
+                    primaryKeys.Add(kvp.Value.SqlColumn)
+                End If
+            Next
+
+            If primaryKeys.Count = 0 Then
+                Throw New System.ArgumentException("No primary keys specified. Either provide keyFields parameter or mark fields with IsPrimaryKey=True in fieldMappings.")
+            End If
+
+            _keyFields = primaryKeys.ToArray()
+        Else
+            _keyFields = keyFields
+        End If
     End Sub
 
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
@@ -1375,8 +1411,8 @@ End Function
 Public Function CreateBusinessLogicForWriting(
     tableName As String,
     fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping),
-    keyFields As String(),
-    allowUpdates As Boolean,
+    Optional keyFields As String() = Nothing,
+    Optional allowUpdates As Boolean = True,
     Optional customExistenceCheckSQL As String = Nothing,
     Optional customUpdateSQL As String = Nothing,
     Optional customWhereClause As String = Nothing
@@ -1387,8 +1423,8 @@ End Function
 Public Function CreateBusinessLogicForBatchWriting(
     tableName As String,
     fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping),
-    keyFields As String(),
-    allowUpdates As Boolean
+    Optional keyFields As String() = Nothing,
+    Optional allowUpdates As Boolean = True
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
     Return AddressOf New BusinessLogicBatchWriterWrapper(tableName, fieldMappings, keyFields, allowUpdates).Execute
 End Function
@@ -1502,6 +1538,7 @@ Public Function CreateFieldMappingsDictionary(
     jsonProps As String(),
     sqlCols As String(),
     Optional isRequiredArray As Boolean() = Nothing,
+    Optional isPrimaryKeyArray As Boolean() = Nothing,
     Optional defaultValArray As Object() = Nothing
 ) As System.Collections.Generic.Dictionary(Of String, FieldMapping)
 
@@ -1509,9 +1546,10 @@ Public Function CreateFieldMappingsDictionary(
 
     For i As Integer = 0 To jsonProps.Length - 1
         Dim isReq As Boolean = If(isRequiredArray IsNot Nothing AndAlso i < isRequiredArray.Length, isRequiredArray(i), False)
+        Dim isPKey As Boolean = If(isPrimaryKeyArray IsNot Nothing AndAlso i < isPrimaryKeyArray.Length, isPrimaryKeyArray(i), False)
         Dim defVal As Object = If(defaultValArray IsNot Nothing AndAlso i < defaultValArray.Length, defaultValArray(i), Nothing)
 
-        dict.Add(jsonProps(i), New FieldMapping(jsonProps(i), sqlCols(i), isReq, defVal))
+        dict.Add(jsonProps(i), New FieldMapping(jsonProps(i), sqlCols(i), isReq, isPKey, defVal))
     Next
 
     Return dict

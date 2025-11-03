@@ -8,6 +8,7 @@ A production-ready Visual Basic .NET library for building flexible, secure REST 
 - **CRUD Operations**: Complete Create, Read, Update, Delete functionality
 - **Batch Processing**: Handle multiple records in a single request
 - **Field Mapping**: Map JSON properties to SQL columns with validation
+- **Primary Key Declaration**: Declare primary keys within field mappings for cleaner API (NEW in v2.1)
 - **Security**: Built-in token validation and parameterized queries
 - **Error Handling**: Comprehensive error handling and reporting
 - **Case-Insensitive**: Parameters are case-insensitive for better usability
@@ -100,16 +101,29 @@ Dim condition = DB.Global.CreateParameterCondition(
 
 ### 2. Field Mappings
 
-Map JSON properties to database columns with validation:
+Map JSON properties to database columns with validation and primary key declaration:
 
 ```vb
 Dim mapping = DB.Global.CreateFieldMapping(
     "userId",           ' JSON property name
     "USER_ID",          ' SQL column name
-    True,               ' Is required
+    True,               ' Is required (for validation)
+    True,               ' Is primary key (for existence checking)
     Nothing             ' Default value
 )
 ```
+
+**Field Mapping Properties:**
+- **JsonProperty**: JSON property name from request payload
+- **SqlColumn**: Database column name
+- **IsRequired**: If True, field must be present in payload (validation)
+- **IsPrimaryKey**: If True, field is used for existence checking (NEW in v2.1)
+- **DefaultValue**: Default value if field is not provided
+
+**Key Insight**:
+- `IsRequired` controls validation (must be present in payload)
+- `IsPrimaryKey` controls existence checking (used in WHERE clause for updates)
+- These are independent - a field can be required without being a primary key, and vice versa
 
 ### 3. Validators
 
@@ -329,6 +343,7 @@ See the `examples/` directory for comprehensive examples:
 - **AdvancedQueries.vb**: Complex queries with parameter conditions
 - **BatchOperations.vb**: Batch insert/update operations
 - **FieldMappingExample.vb**: JSON to SQL field mapping
+- **PrimaryKeyDeclarationExample.vb**: Primary key declaration in field mappings (NEW)
 - **LibraryOptionsExample.vb**: Library options (includeExecutedSQL, etc.)
 - **ErrorHandling.vb**: Error handling patterns
 - **SecurityPatterns.vb**: Token validation and security
@@ -380,6 +395,72 @@ mappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True))
 ```
 
 ## Advanced Features
+
+### Primary Key Declaration in Field Mappings (v2.1)
+
+**NEW**: You can now declare primary keys directly in field mappings instead of passing a separate `keyFields` parameter. This provides a cleaner, more intuitive API where all field configuration is in one place.
+
+#### Old Approach (Still Supported)
+```vb
+' Define field mappings
+Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"userId", "email", "name"},
+    New String() {"UserId", "Email", "Name"},
+    New Boolean() {True, True, False},  ' isRequired
+    New Object() {Nothing, Nothing, Nothing}
+)
+
+' Separate keyFields parameter
+Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
+    "Users",
+    fieldMappings,
+    New String() {"UserId"},  ' keyFields passed separately
+    True
+)
+```
+
+#### New Approach (Recommended)
+```vb
+' Define field mappings with primary key declaration
+Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"userId", "email", "name"},
+    New String() {"UserId", "Email", "Name"},
+    New Boolean() {True, True, False},      ' isRequired
+    New Boolean() {True, False, False},     ' isPrimaryKey (NEW!)
+    New Object() {Nothing, Nothing, Nothing}
+)
+
+' No keyFields parameter needed - extracted from field mappings
+Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
+    "Users",
+    fieldMappings
+    ' Primary keys automatically extracted from IsPrimaryKey=True fields
+)
+```
+
+#### Composite Primary Keys
+```vb
+' Mark multiple fields as primary keys
+Dim compositeMappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"orderId", "productId", "quantity"},
+    New String() {"OrderId", "ProductId", "Quantity"},
+    New Boolean() {True, True, True},       ' All required
+    New Boolean() {True, True, False},      ' Both orderId and productId are PKs
+    New Object() {Nothing, Nothing, Nothing}
+)
+
+Dim logic = DB.Global.CreateBusinessLogicForWriting("OrderItems", compositeMappings)
+' Existence check: WHERE OrderId = :OrderId AND ProductId = :ProductId
+```
+
+**Benefits:**
+- Cleaner API - all field configuration in one place
+- More intuitive - clear which fields are primary keys
+- Supports composite keys naturally
+- Fully backward compatible with old approach
+- Primary keys are used ONLY for existence checking
+
+See `examples/PrimaryKeyDeclarationExample.vb` for comprehensive examples.
 
 ### Custom SQL with Placeholders
 
