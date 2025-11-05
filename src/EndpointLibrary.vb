@@ -59,8 +59,10 @@ Public Shared Function GetPropertyCaseInsensitive(obj As Newtonsoft.Json.Linq.JO
     End If
 
     ' Try exact match first for performance (fastest path)
-    If obj(propertyName) IsNot Nothing Then
-        Return obj(propertyName)
+    ' Use TryGetValue to safely check for property existence
+    Dim propertyValue As Newtonsoft.Json.Linq.JToken = Nothing
+    If obj.TryGetValue(propertyName, propertyValue) AndAlso propertyValue IsNot Nothing Then
+        Return propertyValue
     End If
 
     ' Use cached property name mappings for case-insensitive lookup
@@ -71,9 +73,24 @@ Public Shared Function GetPropertyCaseInsensitive(obj As Newtonsoft.Json.Linq.JO
         System.Threading.Interlocked.Increment(_cacheHitCount)
         Dim actualName As String = Nothing
         If nameMap.TryGetValue(propertyName, actualName) Then
-            Return obj(actualName)
+            ' Validate cached mapping actually exists in object (hash collision protection)
+            Try
+                Dim cachedValue As Newtonsoft.Json.Linq.JToken = Nothing
+                If obj.TryGetValue(actualName, cachedValue) Then
+                    Return cachedValue
+                Else
+                    ' Cache was invalid (possible hash collision), remove and rebuild
+                    _propertyNameCache.TryRemove(objHash, nameMap)
+                    ' Fall through to rebuild cache below
+                End If
+            Catch
+                ' Error accessing cached property, remove invalid cache entry
+                _propertyNameCache.TryRemove(objHash, nameMap)
+                ' Fall through to rebuild cache below
+            End Try
+        Else
+            Return Nothing
         End If
-        Return Nothing
     End If
 
     ' Cache miss - build property name mapping
@@ -478,8 +495,16 @@ Public Class BusinessLogicWriterWrapper
                 recordExists = (CInt(checkQuery.Rowset.Fields("CNT").Value) > 0)
             Finally
                 If checkQuery IsNot Nothing Then
-                    checkQuery.Active = False
-                    checkQuery.Dispose()
+                    Try
+                        checkQuery.Active = False
+                    Catch
+                        ' Ignore cleanup errors
+                    End Try
+                    Try
+                        checkQuery.Dispose()
+                    Catch
+                        ' Ignore disposal errors
+                    End Try
                 End If
             End Try
 
@@ -514,7 +539,13 @@ Public Class BusinessLogicWriterWrapper
 
                         updateQuery.Active = False
                     Finally
-                        If updateQuery IsNot Nothing Then updateQuery.Dispose()
+                        If updateQuery IsNot Nothing Then
+                            Try
+                                updateQuery.Dispose()
+                            Catch
+                                ' Ignore disposal errors
+                            End Try
+                        End If
                     End Try
                 Else
                     ' Use standard UPDATE
@@ -549,7 +580,13 @@ Public Class BusinessLogicWriterWrapper
                         Catch ex As Exception
                             Return New With {.Result = "KO", .Reason = $"Update failed: {ex.Message}"}
                         Finally
-                            If updateQuery IsNot Nothing Then updateQuery.Dispose()
+                            If updateQuery IsNot Nothing Then
+                                Try
+                                    updateQuery.Dispose()
+                                Catch
+                                    ' Ignore disposal errors
+                                End Try
+                            End If
                         End Try
                     Else
                         ' No fields to update (all fields are keys) - still a successful update
@@ -601,7 +638,18 @@ Public Class BusinessLogicWriterWrapper
 
                     Return response
                 Finally
-                    If qTable IsNot Nothing Then qTable.Dispose()
+                    If qTable IsNot Nothing Then
+                        Try
+                            qTable.Active = False
+                        Catch
+                            ' Ignore cleanup errors
+                        End Try
+                        Try
+                            qTable.Dispose()
+                        Catch
+                            ' Ignore disposal errors
+                        End Try
+                    End If
                 End Try
             End If
         Catch ex As Exception
@@ -692,7 +740,13 @@ Private Shared Function BulkExistenceCheck(
                 Dim compositeKey As New System.Text.StringBuilder()
                 For Each keyField As String In keyFields
                     If compositeKey.Length > 0 Then compositeKey.Append("|")
-                    compositeKey.Append(checkQuery.Rowset.Fields(keyField).Value.ToString())
+                    ' Safely handle DBNull values in key fields
+                    Dim fieldValue = checkQuery.Rowset.Fields(keyField).Value
+                    If IsDBNull(fieldValue) OrElse fieldValue Is Nothing Then
+                        compositeKey.Append("[NULL]")
+                    Else
+                        compositeKey.Append(fieldValue.ToString())
+                    End If
                 Next
                 existingKeys.Add(compositeKey.ToString())
                 checkQuery.Rowset.Next()
@@ -700,8 +754,16 @@ Private Shared Function BulkExistenceCheck(
 
         Finally
             If checkQuery IsNot Nothing Then
-                checkQuery.Active = False
-                checkQuery.Dispose()
+                Try
+                    checkQuery.Active = False
+                Catch
+                    ' Ignore cleanup errors
+                End Try
+                Try
+                    checkQuery.Dispose()
+                Catch
+                    ' Ignore disposal errors
+                End Try
             End If
         End Try
 
@@ -720,8 +782,11 @@ Private Shared Function GetCompositeKey(recordParams As System.Collections.Gener
     Dim compositeKey As New System.Text.StringBuilder()
     For Each keyField As String In keyFields
         If compositeKey.Length > 0 Then compositeKey.Append("|")
-        If recordParams.ContainsKey(keyField) Then
+        ' Safely handle null values in key fields
+        If recordParams.ContainsKey(keyField) AndAlso recordParams(keyField) IsNot Nothing Then
             compositeKey.Append(recordParams(keyField).ToString())
+        Else
+            compositeKey.Append("[NULL]")
         End If
     Next
     Return compositeKey.ToString()
@@ -887,7 +952,13 @@ Public Class BusinessLogicBatchWriterWrapper
                                 errors.Add($"{IndexColumnsValues} - Update error: {ex.Message}")
                                 errorCount += 1
                             Finally
-                                If updateQuery IsNot Nothing Then updateQuery.Dispose()
+                                If updateQuery IsNot Nothing Then
+                                    Try
+                                        updateQuery.Dispose()
+                                    Catch
+                                        ' Ignore disposal errors
+                                    End Try
+                                End If
                             End Try
                         Else
                             updatedCount += 1
@@ -931,8 +1002,16 @@ Public Class BusinessLogicBatchWriterWrapper
                             errorCount += 1
                         Finally
                             If insertTable IsNot Nothing Then
-                                insertTable.Active = False
-                                insertTable.Dispose()
+                                Try
+                                    insertTable.Active = False
+                                Catch
+                                    ' Ignore cleanup errors
+                                End Try
+                                Try
+                                    insertTable.Dispose()
+                                Catch
+                                    ' Ignore disposal errors
+                                End Try
                             End If
                         End Try
                     End If
@@ -944,7 +1023,7 @@ Public Class BusinessLogicBatchWriterWrapper
             Next
 
             Return New With {
-                .Result = If(errorCount = 0, "OK", IIf(errorCount >= recordsArray.Count, "KO", "PARTIAL")),
+                .Result = If(errorCount = 0, "OK", If(errorCount >= recordsArray.Count, "KO", "PARTIAL")),
                 .Inserted = insertedCount,
                 .Updated = updatedCount,
                 .Errors = errorCount,
@@ -1006,7 +1085,7 @@ Public Function ProcessActionLink(
         Dim StringResult As String = Newtonsoft.Json.JsonConvert.SerializeObject(result)
 
         If LogMessage IsNot Nothing Then
-            LogCustom(DB, StringPayload, StringResult, "Error at ValidatePayloadAndToken: ")
+            LogCustom(database, StringPayload, StringResult, "Error at ValidatePayloadAndToken: ")
         End If
 
         Return StringResult
@@ -1060,10 +1139,24 @@ Public Shared Function GetStringParameter(payload As Newtonsoft.Json.Linq.JObjec
     Try
         Dim token = GetPropertyCaseInsensitive(payload, paramName)
         If token IsNot Nothing Then
-            Return New System.Tuple(Of Boolean, String)(True, CType(token, Newtonsoft.Json.Linq.JValue).Value.ToString())
-        Else
-            Return New System.Tuple(Of Boolean, String)(False, Nothing)
+            ' Safely handle different token types
+            Select Case token.Type
+                Case Newtonsoft.Json.Linq.JTokenType.String, _
+                     Newtonsoft.Json.Linq.JTokenType.Integer, _
+                     Newtonsoft.Json.Linq.JTokenType.Float, _
+                     Newtonsoft.Json.Linq.JTokenType.Boolean, _
+                     Newtonsoft.Json.Linq.JTokenType.Date
+                    ' For value types, use ToString() which is safe
+                    Return New System.Tuple(Of Boolean, String)(True, token.ToString())
+                Case Newtonsoft.Json.Linq.JTokenType.Null
+                    ' Handle null explicitly
+                    Return New System.Tuple(Of Boolean, String)(True, Nothing)
+                Case Else
+                    ' For arrays/objects, return JSON representation
+                    Return New System.Tuple(Of Boolean, String)(True, token.ToString())
+            End Select
         End If
+        Return New System.Tuple(Of Boolean, String)(False, Nothing)
     Catch ex As Exception
         Return New System.Tuple(Of Boolean, String)(False, Nothing)
     End Try
@@ -1073,10 +1166,18 @@ Public Shared Function GetDateParameter(payload As Newtonsoft.Json.Linq.JObject,
     Try
         Dim token = GetPropertyCaseInsensitive(payload, paramName)
         If token IsNot Nothing Then
-            Return New System.Tuple(Of Boolean, Date)(True, CType(CType(token, Newtonsoft.Json.Linq.JValue).Value, Date))
-        Else
-            Return New System.Tuple(Of Boolean, Date)(False, Date.MinValue)
+            ' Handle Date type directly
+            If token.Type = Newtonsoft.Json.Linq.JTokenType.Date Then
+                Return New System.Tuple(Of Boolean, Date)(True, CType(CType(token, Newtonsoft.Json.Linq.JValue).Value, Date))
+            ElseIf token.Type = Newtonsoft.Json.Linq.JTokenType.String Then
+                ' Try parsing string as date
+                Dim dateValue As Date
+                If Date.TryParse(token.ToString(), dateValue) Then
+                    Return New System.Tuple(Of Boolean, Date)(True, dateValue)
+                End If
+            End If
         End If
+        Return New System.Tuple(Of Boolean, Date)(False, Date.MinValue)
     Catch ex As Exception
         Return New System.Tuple(Of Boolean, Date)(False, Date.MinValue)
     End Try
@@ -1086,10 +1187,26 @@ Public Shared Function GetIntegerParameter(payload As Newtonsoft.Json.Linq.JObje
     Try
         Dim token = GetPropertyCaseInsensitive(payload, paramName)
         If token IsNot Nothing Then
-            Return New System.Tuple(Of Boolean, Integer)(True, CInt(CType(token, Newtonsoft.Json.Linq.JValue).Value))
-        Else
-            Return New System.Tuple(Of Boolean, Integer)(False, 0)
+            ' Handle Integer type directly
+            If token.Type = Newtonsoft.Json.Linq.JTokenType.Integer Then
+                Return New System.Tuple(Of Boolean, Integer)(True, CInt(CType(token, Newtonsoft.Json.Linq.JValue).Value))
+            ElseIf token.Type = Newtonsoft.Json.Linq.JTokenType.String Then
+                ' Try parsing string as integer
+                Dim intValue As Integer
+                If Integer.TryParse(token.ToString(), intValue) Then
+                    Return New System.Tuple(Of Boolean, Integer)(True, intValue)
+                End If
+            ElseIf token.Type = Newtonsoft.Json.Linq.JTokenType.Float Then
+                ' Try converting float to integer (truncate)
+                Try
+                    Dim floatValue As Double = CDbl(CType(token, Newtonsoft.Json.Linq.JValue).Value)
+                    Return New System.Tuple(Of Boolean, Integer)(True, CInt(floatValue))
+                Catch
+                    ' Conversion failed, return false
+                End Try
+            End If
         End If
+        Return New System.Tuple(Of Boolean, Integer)(False, 0)
     Catch ex As Exception
         Return New System.Tuple(Of Boolean, Integer)(False, 0)
     End Try
@@ -1468,7 +1585,9 @@ Private Shared Function ValidateToken(DB As Object, ParsedPayload As Newtonsoft.
             Return CreateErrorResponse("Token must be a string value. " & loggerContext & " error at token validation.")
         End If
 
-        If Not QWLib.Webutils.CheckToken2(token.ToString()) Then
+        ' Extract actual string value from JToken
+        Dim tokenValue As String = CType(token, Newtonsoft.Json.Linq.JValue).Value.ToString()
+        If Not QWLib.Webutils.CheckToken2(tokenValue) Then
             Return CreateErrorResponse("Invalid Token " & loggerContext & " error at token validation.")
         End If
 
