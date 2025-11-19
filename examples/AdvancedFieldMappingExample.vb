@@ -38,9 +38,12 @@ Dim mappedWriter = DB.Global.CreateBusinessLogicForWriting(
     Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator1 = DB.Global.CreateValidator(New String() {"userId", "email", "firstName", "lastName"})
+
 Return DB.Global.ProcessActionLink(
     DB,
-    Nothing,  ' Validation handled by field mappings
+    validator1,
     mappedWriter,
     "User with field mapping",
     ParsedPayload,
@@ -95,8 +98,11 @@ Dim writer2 = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator2 = DB.Global.CreateValidator(New String() {"orderId", "customerId", "orderDate"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, writer2, "Order with validation",
+    DB, validator2, writer2, "Order with validation",
     ParsedPayload2, StringPayload2, False
 )
 
@@ -145,8 +151,11 @@ Dim writer3 = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator3 = DB.Global.CreateValidator(New String() {"productId", "name", "price"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, writer3, "Product with defaults",
+    DB, validator3, writer3, "Product with defaults",
     ParsedPayload3, StringPayload3, False
 )
 
@@ -256,8 +265,11 @@ Dim legacyWriter = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator5 = DB.Global.CreateValidator(New String() {"employeeId", "firstName", "lastName", "hireDate", "departmentCode"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, legacyWriter, "Employee legacy mapping",
+    DB, validator5, legacyWriter, "Employee legacy mapping",
     ParsedPayload5, StringPayload5, False
 )
 
@@ -301,6 +313,7 @@ End If
 Dim jsonProps = New String() {"customerId", "customerName", "contactEmail", "accountType", "creditLimit"}
 Dim sqlCols = New String() {"CUST_ID", "CUST_NAME", "EMAIL_ADDR", "ACCT_TYPE", "CREDIT_LMT"}
 Dim requiredFlags = New Boolean() {True, True, True, False, False}
+Dim isPrimaryKey = New Boolean() {True, False, False, False, False}  ' customerId is primary key
 Dim defaults = New Object() {Nothing, Nothing, Nothing, "STANDARD", 1000}
 
 ' Create dictionary using factory function
@@ -308,6 +321,7 @@ Dim dynamicMappings = DB.Global.CreateFieldMappingsDictionary(
     jsonProps,
     sqlCols,
     requiredFlags,
+    isPrimaryKey,
     defaults
 )
 
@@ -318,8 +332,11 @@ Dim dynamicWriter = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator6 = DB.Global.CreateValidator(New String() {"customerId", "customerName", "contactEmail"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, dynamicWriter, "Customer with dynamic mapping",
+    DB, validator6, dynamicWriter, "Customer with dynamic mapping",
     ParsedPayload6, StringPayload6, False
 )
 
@@ -395,8 +412,11 @@ Dim strictWriter = DB.Global.CreateBusinessLogicForWriting(
     Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator8 = DB.Global.CreateValidator(New String() {"transactionId", "amount", "timestamp"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, strictWriter, "Transaction insert",
+    DB, validator8, strictWriter, "Transaction insert",
     ParsedPayload8, StringPayload8, False
 )
 
@@ -449,8 +469,16 @@ Dim versionedWriter = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Dynamic validation based on API version
+Dim validator9 As System.Func(Of Newtonsoft.Json.Linq.JObject, String)
+If apiVersion = "v1" Then
+    validator9 = DB.Global.CreateValidator(New String() {"id", "name"})
+Else
+    validator9 = DB.Global.CreateValidator(New String() {"userId", "fullName"})
+End If
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, versionedWriter, "Versioned user API",
+    DB, validator9, versionedWriter, "Versioned user API",
     ParsedPayload9, StringPayload9, False
 )
 
@@ -490,8 +518,11 @@ Dim auditWriter = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: Ensure required fields are present
+Dim validator10 = DB.Global.CreateValidator(New String() {"recordId", "description"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, auditWriter, "Audited record",
+    DB, validator10, auditWriter, "Audited record",
     ParsedPayload10, StringPayload10, False
 )
 

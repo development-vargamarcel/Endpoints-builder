@@ -258,6 +258,7 @@ Dim fastReadLogic = DB.Global.CreateBusinessLogicForReading(
     True  ' useForJsonPath = True (PERFORMANCE BOOST!)
 )
 
+' Validator: No required params (all filters are optional for flexible queries)
 Return DB.Global.ProcessActionLink(
     DB, Nothing, fastReadLogic,
     "Products retrieved",

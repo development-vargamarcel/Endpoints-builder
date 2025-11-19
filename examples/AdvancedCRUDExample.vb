@@ -373,6 +373,7 @@ Dim insertMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"title", "content", "category", "author", "rating", "isPublished", "isFeatured", "tags", "version"},
     New String() {"Title", "Content", "Category", "Author", "Rating", "IsPublished", "IsFeatured", "Tags", "Version"},
     New Boolean() {True, False, False, False, False, False, False, False, False},  ' Only title is required
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, Nothing, "1.0.0"}  ' Defaults
 )
 
@@ -427,6 +428,7 @@ Dim upsertMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
     New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
     New Boolean() {True, True, False, False, False, False, False, False, False, False, False},  ' articleId and title required
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0, 0, Nothing}
 )
 
@@ -490,6 +492,7 @@ Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "isPublished", "isFeatured"},
     New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "IsPublished", "IsFeatured"},
     New Boolean() {True, True, False, False, False, False, False, False, False},
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0}
 )
 
@@ -569,6 +572,7 @@ Dim metricsMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"articleId"},
     New String() {"ArticleId"},
     New Boolean() {True},
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
 )
 
@@ -616,6 +620,7 @@ Dim publishMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"articleId"},
     New String() {"ArticleId"},
     New Boolean() {True},
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
 )
 
@@ -657,6 +662,7 @@ Dim likeMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"articleId"},
     New String() {"ArticleId"},
     New Boolean() {True},
+    Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
 )
 
@@ -747,6 +753,7 @@ If DestinationIdentifierInfo.Item1 Then
             New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
             New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
             New Boolean() {True, True, False, False, False, False, False, False, False, False, False},
+            Nothing,  ' No primary key array - using explicit keyFields parameter below
             New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0, 0, Nothing}
         )
 
@@ -790,6 +797,7 @@ If DestinationIdentifierInfo.Item1 Then
             New String() {"articleId"},
             New String() {"ArticleId"},
             New Boolean() {True},
+            Nothing,  ' No primary key array - using explicit keyFields parameter below
             New Object() {Nothing}
         )
 
