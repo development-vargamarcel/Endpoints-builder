@@ -27,6 +27,7 @@ Dim secureLogic = DB.Global.CreateBusinessLogicForReading(
     secureConditions
 )
 
+' Validator: No required params for flexible search, but token is enforced
 Return DB.Global.ProcessActionLink(
     DB,
     Nothing,
@@ -208,8 +209,11 @@ Dim roleBasedLogic = DB.Global.CreateBusinessLogicForReading(
     $"UserId = '{userId}'"  ' Default: users see only their data
 )
 
+' Validator: UserId and UserRole are required for authorization
+Dim validator5 = DB.Global.CreateValidator(New String() {"UserId", "UserRole"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, roleBasedLogic, "Role-based order access",
+    DB, validator5, roleBasedLogic, "Role-based order access",
     ParsedPayload5, StringPayload5, True
 )
 
@@ -249,8 +253,11 @@ Dim logic6 = DB.Global.CreateBusinessLogicForReading(
     productConditions
 )
 
+' Validator: UserId is required for audit trail
+Dim validator6 = DB.Global.CreateValidator(New String() {"UserId"})
+
 Dim result6 = DB.Global.ProcessActionLink(
-    DB, Nothing, logic6, "Product query",
+    DB, validator6, logic6, "Product query",
     ParsedPayload6, StringPayload6, True
 )
 
@@ -294,6 +301,7 @@ Dim updateMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"UserId", "Email", "Phone", "Address"},
     New String() {"UserId", "Email", "Phone", "Address"},
     New Boolean() {True, False, False, False},
+    New Boolean() {True, False, False, False},  ' UserId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
 )
 
@@ -344,8 +352,11 @@ Dim safeUpdateLogic = DB.Global.CreateBusinessLogicForWriting(
     True, Nothing, Nothing, Nothing
 )
 
+' Validator: UserId is required to identify which profile to update
+Dim validator8 = DB.Global.CreateValidator(New String() {"userId"})
+
 Return DB.Global.ProcessActionLink(
-    DB, Nothing, safeUpdateLogic, "Safe profile update",
+    DB, validator8, safeUpdateLogic, "Safe profile update",
     ParsedPayload8, StringPayload8, True
 )
 
@@ -400,6 +411,7 @@ Dim noteMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"NoteId", "UserId", "Title", "Content"},
     New String() {"NoteId", "UserId", "Title", "Content"},
     New Boolean() {True, True, False, False},
+    New Boolean() {True, False, False, False},  ' NoteId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
 )
 

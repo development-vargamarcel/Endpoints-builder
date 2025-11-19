@@ -217,6 +217,7 @@ Dim oldStyleMappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"userId", "email", "name"},
     New String() {"UserId", "Email", "Name"},
     New Boolean() {True, True, False},
+    Nothing,  ' No IsPrimaryKey array - will use explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing}
 )
 
