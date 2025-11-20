@@ -205,8 +205,6 @@ Dim readLogic = DB.Global.CreateBusinessLogicForReading(
 - **Debugging**: Keep SQL visible in development for troubleshooting
 - **Backward Compatible**: Defaults to `True`, so existing code continues to work unchanged
 
-**Example:** See `examples/LibraryOptionsExample.vb` for comprehensive examples of using library options.
-
 ## API Reference
 
 ### Factory Functions
@@ -612,26 +610,29 @@ conditions.Add("email", DB.Global.CreateParameterCondition(
 ```
 Endpoints-builder/
 ├── src/
-│   └── EndpointLibrary.vb          # Main library file
+│   └── EndpointLibrary.vb                      # Main library file
 ├── examples/
-│   ├── BasicUsageExample.vb        # Original usage example
-│   ├── CrudOperations.vb           # CRUD examples
-│   ├── AdvancedQueries.vb          # Advanced query examples
-│   ├── BatchOperations.vb          # Batch operation examples
-│   ├── FieldMappingExample.vb      # Field mapping examples
-│   ├── LibraryOptionsExample.vb    # Library options examples
-│   ├── ErrorHandling.vb            # Error handling patterns
-│   └── SecurityPatterns.vb         # Security best practices
+│   ├── EnterpriseEndpointExample.vb            # Production-ready endpoint template
+│   ├── AdvancedBatchAndPerformanceExample.vb   # High-performance batch processing
+│   ├── AdvancedQueryingExample.vb              # Complex filtering and queries
+│   ├── AdvancedCRUDExample.vb                  # Complete CRUD workflow
+│   ├── AdvancedSecurityPatterns.vb             # Security best practices
+│   ├── AdvancedPrimaryKeyExample.vb            # Primary key declaration (v2.1+)
+│   ├── AdvancedFieldMappingExample.vb          # JSON-to-SQL field mappings
+│   ├── RobustnessImprovementsExample.vb        # Robustness features (v2.2+)
+│   ├── AdvancedCRUDExample_Setup.sql           # Database setup script
+│   └── README.md                                # Examples documentation
 ├── docs/
-│   ├── API.md                      # Detailed API documentation
-│   ├── SECURITY.md                 # Security guidelines
-│   └── MIGRATION.md                # Migration guide
+│   ├── API.md                                   # Detailed API documentation
+│   ├── SECURITY.md                              # Security guidelines
+│   ├── PERFORMANCE_ANALYSIS.md                  # Performance analysis
+│   └── PERFORMANCE_IMPROVEMENTS.md              # Performance improvements
 ├── tests/
-│   └── TestScenarios.md            # Test scenarios
-├── README.md                        # This file
-├── CHANGELOG.md                     # Version history
-├── CONTRIBUTING.md                  # Contribution guidelines
-└── LICENSE                          # License file
+│   └── TestScenarios.md                         # Test scenarios
+├── README.md                                    # This file
+├── CHANGELOG.md                                 # Version history
+├── CONTRIBUTING.md                              # Contribution guidelines
+└── LICENSE                                      # License file
 ```
 
 ## Error Handling

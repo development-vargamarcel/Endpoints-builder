@@ -137,6 +137,25 @@ Comprehensive field mapping scenarios:
 
 ---
 
+### 🛡️ RobustnessImprovementsExample.vb
+**Security and robustness features (v2.2+)**
+
+New robustness and security enhancements:
+- Query prepending with `prependSQL` parameter
+- SET DATEFORMAT for consistent date parsing
+- SET NOCOUNT ON for performance
+- Transaction isolation level control
+- Lock timeout configuration
+- SQL injection prevention enhancements
+- Resource cleanup patterns
+- Error handling improvements
+- Session-level SQL configuration
+- Cross-locale compatibility
+
+**10 comprehensive examples** demonstrating v2.2+ features
+
+---
+
 ### 📄 AdvancedCRUDExample_Setup.sql
 **Database setup script**
 
@@ -169,6 +188,9 @@ SQL Server setup for the CRUD example:
 **For security hardening:**
 → Start with `AdvancedSecurityPatterns.vb`
 
+**For robustness and query prepending (v2.2+):**
+→ Start with `RobustnessImprovementsExample.vb`
+
 ### 2. Database Setup
 
 If using the CRUD example:
@@ -191,18 +213,20 @@ All examples are **fully documented** with:
 
 ## 📊 Feature Comparison
 
-| Feature | Enterprise | Batch/Perf | Querying | Security | PK Decl | Field Map | CRUD |
-|---------|-----------|-----------|----------|----------|---------|-----------|------|
-| Token Validation | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
-| Role-Based Access | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
-| Batch Operations | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ✅ |
-| FOR JSON PATH | ✅ | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ✅ |
-| Complex Queries | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ |
-| Field Mappings | ✅ | ✅ | ⚪ | ⚪ | ✅ | ✅ | ✅ |
-| Primary Key Decl | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ |
-| Audit Logging | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
-| Custom SQL | ✅ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ |
-| Multi-Operation | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ |
+| Feature | Enterprise | Batch/Perf | Querying | Security | PK Decl | Field Map | CRUD | Robustness |
+|---------|-----------|-----------|----------|----------|---------|-----------|------|------------|
+| Token Validation | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| Role-Based Access | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| Batch Operations | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ✅ | ⚪ |
+| FOR JSON PATH | ✅ | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
+| Complex Queries | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
+| Field Mappings | ✅ | ✅ | ⚪ | ⚪ | ✅ | ✅ | ✅ | ⚪ |
+| Primary Key Decl | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
+| Audit Logging | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
+| Custom SQL | ✅ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
+| Multi-Operation | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
+| Query Prepending | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ |
+| Session Config | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ |
 
 ---
 
@@ -370,8 +394,8 @@ These examples represent best practices. When contributing new examples:
 
 ---
 
-**Last Updated**: 2025-11-19
-**Library Version**: 2.1+
-**Examples Count**: 8 advanced examples
+**Last Updated**: 2025-11-20
+**Library Version**: 2.2+
+**Examples Count**: 8 advanced examples + 1 SQL setup file
 
 For questions or issues, please refer to the main project documentation or create an issue in the repository.
