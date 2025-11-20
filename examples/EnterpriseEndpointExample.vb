@@ -45,8 +45,8 @@ If Not userIdResult.Item1 OrElse Not userRoleResult.Item1 Then
     Return DB.Global.CreateErrorResponse("Authentication context required (UserId and UserRole)")
 End If
 
-Dim userId As String = userIdResult.Item2
-Dim userRole As String = userRoleResult.Item2
+Dim userId As System.String = userIdResult.Item2
+Dim userRole As System.String = userRoleResult.Item2
 
 ' Get destination identifier to route to appropriate operation
 Dim destInfo = DB.Global.GetDestinationIdentifier(ParsedPayload)
@@ -55,7 +55,7 @@ If Not destInfo.Item1 Then
     Return DB.Global.CreateErrorResponse(destInfo.Item2)
 End If
 
-Dim operation As String = destInfo.Item2
+Dim operation As System.String = destInfo.Item2
 
 ' Route to appropriate operation
 Select Case operation.ToLower()
@@ -67,7 +67,7 @@ Select Case operation.ToLower()
         ' Advanced search with multiple filters, role-based access control
         ' Uses FOR JSON PATH for 40-60% better performance
 
-        Dim searchConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+        Dim searchConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
         ' Flexible search conditions
         searchConditions.Add("OrderId", DB.Global.CreateParameterCondition(
@@ -92,7 +92,7 @@ Select Case operation.ToLower()
             "MaxAmount", "TotalAmount <= :MaxAmount", Nothing))
 
         ' Role-based access control
-        Dim defaultWhere As String
+        Dim defaultWhere As System.String
         If userRole.ToUpper() = "ADMIN" OrElse userRole.ToUpper() = "MANAGER" Then
             ' Admins and managers see all non-deleted orders
             defaultWhere = "IsDeleted = 0"
@@ -140,8 +140,8 @@ Select Case operation.ToLower()
 
         ' Define field mappings with primary key declaration (v2.1+ feature)
         Dim upsertMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"orderId", "customerId", "orderDate", "status", "totalAmount", "currency", "shippingAddress", "notes"},
-            New String() {"OrderId", "CustomerId", "OrderDate", "Status", "TotalAmount", "Currency", "ShippingAddress", "Notes"},
+            New System.String() {"orderId", "customerId", "orderDate", "status", "totalAmount", "currency", "shippingAddress", "notes"},
+            New System.String() {"OrderId", "CustomerId", "OrderDate", "Status", "TotalAmount", "Currency", "ShippingAddress", "Notes"},
             New Boolean() {True, True, False, False, False, False, False, False},     ' orderId, customerId required
             New Boolean() {True, False, False, False, False, False, False, False},    ' orderId is primary key
             New Object() {Nothing, Nothing, Nothing, "PENDING", 0, "USD", Nothing, Nothing}  ' Defaults
@@ -152,7 +152,7 @@ Select Case operation.ToLower()
         If targetOrderIdResult.Item1 AndAlso userRole.ToUpper() <> "ADMIN" Then
             ' Check if order exists and belongs to user
             Dim checkQuery = $"SELECT COUNT(*) FROM Orders WHERE OrderId = '{targetOrderIdResult.Item2}' AND CreatedBy = '{userId}'"
-            Dim checkResult = DB.ExecuteQueryWithParameters(checkQuery, New Dictionary(Of String, Object))
+            Dim checkResult = DB.ExecuteQueryWithParameters(checkQuery, New Dictionary(Of System.String, System.Object))
             ' Additional authorization logic here...
         End If
 
@@ -186,7 +186,7 @@ Select Case operation.ToLower()
         )
 
         ' Validate required fields
-        Dim validator = DB.Global.CreateValidator(New String() {"orderId", "customerId"})
+        Dim validator = DB.Global.CreateValidator(New System.String() {"orderId", "customerId"})
 
         ' Log the operation
         DB.Global.LogCustom(DB, StringPayload, "Order upsert", $"User {userId} upserted order")
@@ -224,8 +224,8 @@ Select Case operation.ToLower()
 
         ' Define field mappings for batch with primary key declaration
         Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"orderId", "customerId", "orderDate", "status", "totalAmount", "currency", "shippingAddress", "notes"},
-            New String() {"OrderId", "CustomerId", "OrderDate", "Status", "TotalAmount", "Currency", "ShippingAddress", "Notes"},
+            New System.String() {"orderId", "customerId", "orderDate", "status", "totalAmount", "currency", "shippingAddress", "notes"},
+            New System.String() {"OrderId", "CustomerId", "OrderDate", "Status", "TotalAmount", "Currency", "ShippingAddress", "Notes"},
             New Boolean() {True, True, False, False, False, False, False, False},
             New Boolean() {True, False, False, False, False, False, False, False},    ' orderId is PK
             New Object() {Nothing, Nothing, Nothing, "PENDING", 0, "USD", Nothing, Nothing}
@@ -240,7 +240,7 @@ Select Case operation.ToLower()
         )
 
         ' Validate batch payload structure
-        Dim batchValidator = DB.Global.CreateValidatorForBatch(New String() {"Records"})
+        Dim batchValidator = DB.Global.CreateValidatorForBatch(New System.String() {"Records"})
 
         ' Log batch operation
         DB.Global.LogCustom(DB, StringPayload, "Batch order operation", $"User {userId} executed batch order operation")
@@ -290,9 +290,9 @@ Select Case operation.ToLower()
         ' Custom SQL operation for status transitions with validation
 
         ' Validate required fields
-        Dim statusValidator = DB.Global.CreateValidator(New String() {"orderId", "newStatus"})
+        Dim statusValidator = DB.Global.CreateValidator(New System.String() {"orderId", "newStatus"})
         Dim statusValidationError = statusValidator(ParsedPayload)
-        If Not String.IsNullOrEmpty(statusValidationError) Then
+        If Not System.String.IsNullOrEmpty(statusValidationError) Then
             Return statusValidationError
         End If
 
@@ -301,9 +301,9 @@ Select Case operation.ToLower()
         Dim newStatusParam = DB.Global.GetStringParameter(ParsedPayload, "newStatus")
 
         ' Validate status value (whitelist)
-        Dim allowedStatuses = New String() {"PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"}
+        Dim allowedStatuses = New System.String() {"PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"}
         If Not allowedStatuses.Contains(newStatusParam.Item2.ToUpper()) Then
-            Return DB.Global.CreateErrorResponse($"Invalid status. Allowed: {String.Join(", ", allowedStatuses)}")
+            Return DB.Global.CreateErrorResponse($"Invalid status. Allowed: {System.String.Join(", ", allowedStatuses)}")
         End If
 
         ' Authorization: verify user has permission
@@ -315,8 +315,8 @@ Select Case operation.ToLower()
 
         ' Minimal field mapping for custom SQL
         Dim statusMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"orderId"},
-            New String() {"OrderId"},
+            New System.String() {"orderId"},
+            New System.String() {"OrderId"},
             New Boolean() {True},
             New Boolean() {True},    ' OrderId is PK
             New Object() {Nothing}
@@ -364,7 +364,7 @@ Select Case operation.ToLower()
         '===================================
         ' Complex analytical query with GROUP BY and aggregations
 
-        Dim statsConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+        Dim statsConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
         statsConditions.Add("StartDate", DB.Global.CreateParameterCondition(
             "StartDate", "OrderDate >= :StartDate", Nothing))
@@ -376,7 +376,7 @@ Select Case operation.ToLower()
             "CustomerId", "CustomerId = :CustomerId", Nothing))
 
         ' Role-based default filter
-        Dim statsDefaultWhere As String
+        Dim statsDefaultWhere As System.String
         If userRole.ToUpper() = "ADMIN" OrElse userRole.ToUpper() = "MANAGER" Then
             statsDefaultWhere = "IsDeleted = 0"
         Else
@@ -441,9 +441,9 @@ Select Case operation.ToLower()
         ' Marks order as deleted instead of physical deletion
 
         ' Authorization: only order owner or admin can delete
-        Dim deleteValidator = DB.Global.CreateValidator(New String() {"orderId"})
+        Dim deleteValidator = DB.Global.CreateValidator(New System.String() {"orderId"})
         Dim deleteValidationError = deleteValidator(ParsedPayload)
-        If Not String.IsNullOrEmpty(deleteValidationError) Then
+        If Not System.String.IsNullOrEmpty(deleteValidationError) Then
             Return deleteValidationError
         End If
 
@@ -456,8 +456,8 @@ Select Case operation.ToLower()
         End If
 
         Dim deleteMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"orderId"},
-            New String() {"OrderId"},
+            New System.String() {"orderId"},
+            New System.String() {"OrderId"},
             New Boolean() {True},
             New Boolean() {True},
             New Object() {Nothing}

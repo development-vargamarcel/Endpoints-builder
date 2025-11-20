@@ -16,7 +16,7 @@ If PayloadError IsNot Nothing Then
 End If
 
 ' Define search conditions
-Dim secureConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim secureConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 secureConditions.Add("RecordId", DB.Global.CreateParameterCondition("RecordId", "RecordId = :RecordId", Nothing))
 secureConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
 
@@ -60,7 +60,7 @@ If PayloadError2 IsNot Nothing Then
 End If
 
 ' Define search conditions for profile
-Dim profileConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim profileConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 profileConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
 profileConditions.Add("Email", DB.Global.CreateParameterCondition("Email", "Email = :Email", Nothing))
 profileConditions.Add("Phone", DB.Global.CreateParameterCondition("Phone", "Phone = :Phone", Nothing))
@@ -92,7 +92,7 @@ If PayloadError3 IsNot Nothing Then
 End If
 
 ' This is SAFE - uses parameterized query
-Dim safeConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim safeConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 safeConditions.Add("ProductName", DB.Global.CreateParameterCondition("ProductName", "ProductName LIKE :ProductName", Nothing))
 safeConditions.Add("Category", DB.Global.CreateParameterCondition("Category", "Category = :Category", Nothing))
 
@@ -126,21 +126,21 @@ If PayloadError4 IsNot Nothing Then
 End If
 
 ' Strict validation
-Dim requiredParams = New String() {"UserId", "Action", "Timestamp"}
+Dim requiredParams = New System.String() {"UserId", "Action", "Timestamp"}
 Dim validator4 = DB.Global.CreateValidator(requiredParams)
 
 ' Additional custom validation example
 Dim actionResult = DB.Global.GetStringParameter(ParsedPayload4, "Action")
 If actionResult.Item1 Then
-    Dim action As String = actionResult.Item2
+    Dim action As System.String = actionResult.Item2
     ' Whitelist allowed actions
-    Dim allowedActions = New String() {"READ", "UPDATE", "DELETE"}
+    Dim allowedActions = New System.String() {"READ", "UPDATE", "DELETE"}
     If Not allowedActions.Contains(action.ToUpper()) Then
         Return DB.Global.CreateErrorResponse("Invalid action. Allowed: READ, UPDATE, DELETE")
     End If
 End If
 
-Dim auditConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim auditConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 auditConditions.Add("UserId", DB.Global.CreateParameterCondition("UserId", "UserId = :UserId", Nothing))
 auditConditions.Add("Action", DB.Global.CreateParameterCondition("Action", "Action = :Action", Nothing))
 
@@ -175,11 +175,11 @@ If Not userRoleResult.Item1 OrElse Not userIdResult.Item1 Then
     Return DB.Global.CreateErrorResponse("UserRole and UserId are required")
 End If
 
-Dim userRole As String = userRoleResult.Item2
-Dim userId As String = userIdResult.Item2
+Dim userRole As System.String = userRoleResult.Item2
+Dim userId As System.String = userIdResult.Item2
 
 ' Build query based on role
-Dim roleConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim roleConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 If userRole.ToUpper() = "ADMIN" Then
     ' Admins see all records
@@ -210,7 +210,7 @@ Dim roleBasedLogic = DB.Global.CreateBusinessLogicForReading(
 )
 
 ' Validator: UserId and UserRole are required for authorization
-Dim validator5 = DB.Global.CreateValidator(New String() {"UserId", "UserRole"})
+Dim validator5 = DB.Global.CreateValidator(New System.String() {"UserId", "UserRole"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator5, roleBasedLogic, "Role-based order access",
@@ -241,11 +241,11 @@ If Not userIdResult6.Item1 Then
 End If
 
 ' Log the request BEFORE processing
-Dim logMessage = $"API Request from User: {userIdResult6.Item2} at {DateTime.Now}"
+Dim logMessage = $"API Request from User: {userIdResult6.Item2} at {System.DateTime.Now}"
 DB.Global.LogCustom(DB, StringPayload6, "Request received", logMessage)
 
 ' Process the request
-Dim productConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim productConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 productConditions.Add("Category", DB.Global.CreateParameterCondition("Category", "Category = :Category", Nothing))
 
 Dim logic6 = DB.Global.CreateBusinessLogicForReading(
@@ -254,7 +254,7 @@ Dim logic6 = DB.Global.CreateBusinessLogicForReading(
 )
 
 ' Validator: UserId is required for audit trail
-Dim validator6 = DB.Global.CreateValidator(New String() {"UserId"})
+Dim validator6 = DB.Global.CreateValidator(New System.String() {"UserId"})
 
 Dim result6 = DB.Global.ProcessActionLink(
     DB, validator6, logic6, "Product query",
@@ -298,8 +298,8 @@ End If
 
 ' Proceed with update - create field mappings
 Dim updateMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"UserId", "Email", "Phone", "Address"},
-    New String() {"UserId", "Email", "Phone", "Address"},
+    New System.String() {"UserId", "Email", "Phone", "Address"},
+    New System.String() {"UserId", "Email", "Phone", "Address"},
     New Boolean() {True, False, False, False},
     New Boolean() {True, False, False, False},  ' UserId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -308,13 +308,13 @@ Dim updateMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim updateLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
     updateMappings,
-    New String() {"UserId"},
+    New System.String() {"UserId"},
     True
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"UserId"}),
+    DB.Global.CreateValidator(New System.String() {"UserId"}),
     updateLogic,
     "Authorized user update",
     ParsedPayload7,
@@ -334,7 +334,7 @@ If PayloadError8 IsNot Nothing Then
 End If
 
 ' Use field mappings to explicitly control which fields can be updated
-Dim safeUpdateMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim safeUpdateMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 ' Only these fields can be updated by users
 safeUpdateMappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True, Nothing))
@@ -348,12 +348,12 @@ safeUpdateMappings.Add("avatarUrl", DB.Global.CreateFieldMapping("avatarUrl", "A
 Dim safeUpdateLogic = DB.Global.CreateBusinessLogicForWriting(
     "USER_PROFILES",
     safeUpdateMappings,
-    New String() {"USER_ID"},
+    New System.String() {"USER_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: UserId is required to identify which profile to update
-Dim validator8 = DB.Global.CreateValidator(New String() {"userId"})
+Dim validator8 = DB.Global.CreateValidator(New System.String() {"userId"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator8, safeUpdateLogic, "Safe profile update",
@@ -408,8 +408,8 @@ End If
 
 ' Proceed with batch operation - create field mappings
 Dim noteMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"NoteId", "UserId", "Title", "Content"},
-    New String() {"NoteId", "UserId", "Title", "Content"},
+    New System.String() {"NoteId", "UserId", "Title", "Content"},
+    New System.String() {"NoteId", "UserId", "Title", "Content"},
     New Boolean() {True, True, False, False},
     New Boolean() {True, False, False, False},  ' NoteId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -418,13 +418,13 @@ Dim noteMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim batchLogic9 = DB.Global.CreateBusinessLogicForBatchWriting(
     "UserNotes",
     noteMappings,
-    New String() {"NoteId"},
+    New System.String() {"NoteId"},
     True
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     batchLogic9,
     "Secure batch note update",
     ParsedPayload9,
@@ -453,15 +453,15 @@ If Not authUserId.Item1 OrElse Not authUserRole.Item1 Then
 End If
 
 ' 3. ✓ Validate required parameters
-Dim validator10 = DB.Global.CreateValidator(New String() {"Operation", "TargetResource"})
+Dim validator10 = DB.Global.CreateValidator(New System.String() {"Operation", "TargetResource"})
 Dim validationError = validator10(ParsedPayload10)
-If Not String.IsNullOrEmpty(validationError) Then
+If Not System.String.IsNullOrEmpty(validationError) Then
     Return validationError
 End If
 
 ' 4. ✓ Whitelist allowed operations
 Dim operationResult = DB.Global.GetStringParameter(ParsedPayload10, "Operation")
-Dim allowedOps = New String() {"READ", "CREATE", "UPDATE"}
+Dim allowedOps = New System.String() {"READ", "CREATE", "UPDATE"}
 If Not allowedOps.Contains(operationResult.Item2.ToUpper()) Then
     Return DB.Global.CreateErrorResponse("Invalid operation")
 End If
@@ -473,7 +473,7 @@ If authUserRole.Item2.ToUpper() <> "ADMIN" AndAlso targetResourceResult.Item2 = 
 End If
 
 ' 6. ✓ Use field mappings to prevent mass assignment
-Dim secureMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim secureMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 secureMappings.Add("resourceId", DB.Global.CreateFieldMapping("resourceId", "RESOURCE_ID", True, Nothing))
 secureMappings.Add("title", DB.Global.CreateFieldMapping("title", "TITLE", False, Nothing))
 secureMappings.Add("description", DB.Global.CreateFieldMapping("description", "DESCRIPTION", False, Nothing))
@@ -481,7 +481,7 @@ secureMappings.Add("description", DB.Global.CreateFieldMapping("description", "D
 
 ' 7. ✓ Exclude sensitive fields from SQL SELECT (do not include PasswordHash, ApiKey, InternalNotes)
 ' 8. ✓ Add row-level security with WHERE clause
-Dim securityConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim securityConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 securityConditions.Add("resourceId", DB.Global.CreateParameterCondition(
     "resourceId",
     "RESOURCE_ID = :resourceId",
@@ -489,7 +489,7 @@ securityConditions.Add("resourceId", DB.Global.CreateParameterCondition(
 ))
 
 ' Force filter by owner unless admin
-Dim defaultWhere As String
+Dim defaultWhere As System.String
 If authUserRole.Item2.ToUpper() = "ADMIN" Then
     defaultWhere = "IS_DELETED = 0"  ' Admins see all non-deleted
 Else

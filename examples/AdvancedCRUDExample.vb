@@ -84,7 +84,7 @@ If PayloadError IsNot Nothing Then
 End If
 
 ' Define parameter conditions for flexible search
-Dim searchConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim searchConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 searchConditions.Add("ArticleId", DB.Global.CreateParameterCondition(
     "ArticleId",
@@ -194,7 +194,7 @@ If PayloadError2 IsNot Nothing Then
     Return PayloadError2
 End If
 
-Dim dateConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim dateConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 dateConditions.Add("StartDate", DB.Global.CreateParameterCondition(
     "StartDate",
@@ -255,7 +255,7 @@ If PayloadError3 IsNot Nothing Then
     Return PayloadError3
 End If
 
-Dim fastConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim fastConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 fastConditions.Add("Category", DB.Global.CreateParameterCondition(
     "Category",
@@ -303,7 +303,7 @@ If PayloadError4 IsNot Nothing Then
     Return PayloadError4
 End If
 
-Dim statsConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim statsConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 statsConditions.Add("IsPublished", DB.Global.CreateParameterCondition(
     "IsPublished",
@@ -370,8 +370,8 @@ End If
 
 ' Define field mappings (JSON property -> SQL column)
 Dim insertMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"title", "content", "category", "author", "rating", "isPublished", "isFeatured", "tags", "version"},
-    New String() {"Title", "Content", "Category", "Author", "Rating", "IsPublished", "IsFeatured", "Tags", "Version"},
+    New System.String() {"title", "content", "category", "author", "rating", "isPublished", "isFeatured", "tags", "version"},
+    New System.String() {"Title", "Content", "Category", "Author", "Rating", "IsPublished", "IsFeatured", "Tags", "Version"},
     New Boolean() {True, False, False, False, False, False, False, False, False},  ' Only title is required
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, Nothing, "1.0.0"}  ' Defaults
@@ -381,13 +381,13 @@ Dim insertMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim insertLogic = DB.Global.CreateBusinessLogicForWriting(
     "P_TestingTableArticles",
     insertMappings,
-    New String() {"ArticleId"},  ' Key field
+    New System.String() {"ArticleId"},  ' Key field
     False  ' allowUpdates = False (insert only)
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"title"}),
+    DB.Global.CreateValidator(New System.String() {"title"}),
     insertLogic,
     "Article inserted",
     ParsedPayloadInsert,
@@ -425,8 +425,8 @@ If PayloadErrorUpsert IsNot Nothing Then
 End If
 
 Dim upsertMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
-    New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
+    New System.String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
+    New System.String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
     New Boolean() {True, True, False, False, False, False, False, False, False, False, False},  ' articleId and title required
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0, 0, Nothing}
@@ -436,13 +436,13 @@ Dim upsertMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim upsertLogic = DB.Global.CreateBusinessLogicForWriting(
     "P_TestingTableArticles",
     upsertMappings,
-    New String() {"ArticleId"},
+    New System.String() {"ArticleId"},
     True  ' allowUpdates = True (upsert)
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"articleId", "title"}),
+    DB.Global.CreateValidator(New System.String() {"articleId", "title"}),
     upsertLogic,
     "Article upserted",
     ParsedPayloadUpsert,
@@ -489,8 +489,8 @@ If PayloadErrorBatch IsNot Nothing Then
 End If
 
 Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "isPublished", "isFeatured"},
-    New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "IsPublished", "IsFeatured"},
+    New System.String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "isPublished", "isFeatured"},
+    New System.String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "IsPublished", "IsFeatured"},
     New Boolean() {True, True, False, False, False, False, False, False, False},
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0}
@@ -499,13 +499,13 @@ Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "P_TestingTableArticles",
     batchMappings,
-    New String() {"ArticleId"},
+    New System.String() {"ArticleId"},
     True  ' Allow updates
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     batchLogic,
     "Batch operation completed",
     ParsedPayloadBatch,
@@ -569,8 +569,8 @@ If PayloadErrorMetrics IsNot Nothing Then
 End If
 
 Dim metricsMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"articleId"},
-    New String() {"ArticleId"},
+    New System.String() {"articleId"},
+    New System.String() {"ArticleId"},
     New Boolean() {True},
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
@@ -579,7 +579,7 @@ Dim metricsMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim metricsLogic = DB.Global.CreateBusinessLogicForWriting(
     "P_TestingTableArticles",
     metricsMappings,
-    New String() {"ArticleId"},
+    New System.String() {"ArticleId"},
     True,
     Nothing,  ' Default existence check
     "UPDATE P_TestingTableArticles SET ViewCount = ViewCount + 1, LastModifiedDate = GETDATE() WHERE ArticleId = :ArticleId",  ' Custom update
@@ -588,7 +588,7 @@ Dim metricsLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"articleId"}),
+    DB.Global.CreateValidator(New System.String() {"articleId"}),
     metricsLogic,
     "Article metrics updated",
     ParsedPayloadMetrics,
@@ -617,8 +617,8 @@ If PayloadErrorPublish IsNot Nothing Then
 End If
 
 Dim publishMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"articleId"},
-    New String() {"ArticleId"},
+    New System.String() {"articleId"},
+    New System.String() {"ArticleId"},
     New Boolean() {True},
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
@@ -627,7 +627,7 @@ Dim publishMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim publishLogic = DB.Global.CreateBusinessLogicForWriting(
     "P_TestingTableArticles",
     publishMappings,
-    New String() {"ArticleId"},
+    New System.String() {"ArticleId"},
     True,
     Nothing,
     "UPDATE P_TestingTableArticles SET IsPublished = 1, PublishedDate = GETDATE() WHERE ArticleId = :ArticleId",
@@ -636,7 +636,7 @@ Dim publishLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"articleId"}),
+    DB.Global.CreateValidator(New System.String() {"articleId"}),
     publishLogic,
     "Article published",
     ParsedPayloadPublish,
@@ -659,8 +659,8 @@ If PayloadErrorLike IsNot Nothing Then
 End If
 
 Dim likeMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"articleId"},
-    New String() {"ArticleId"},
+    New System.String() {"articleId"},
+    New System.String() {"ArticleId"},
     New Boolean() {True},
     Nothing,  ' No primary key array - using explicit keyFields parameter below
     New Object() {Nothing}
@@ -669,7 +669,7 @@ Dim likeMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim likeLogic = DB.Global.CreateBusinessLogicForWriting(
     "P_TestingTableArticles",
     likeMappings,
-    New String() {"ArticleId"},
+    New System.String() {"ArticleId"},
     True,
     Nothing,
     "UPDATE P_TestingTableArticles SET LikeCount = LikeCount + 1 WHERE ArticleId = :ArticleId",
@@ -678,7 +678,7 @@ Dim likeLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"articleId"}),
+    DB.Global.CreateValidator(New System.String() {"articleId"}),
     likeLogic,
     "Like recorded",
     ParsedPayloadLike,
@@ -710,13 +710,13 @@ End If
 Dim DestinationIdentifierInfo = DB.Global.GetDestinationIdentifier(ParsedPayloadComplete)
 
 If DestinationIdentifierInfo.Item1 Then
-    Dim destinationId As String = DestinationIdentifierInfo.Item2
+    Dim destinationId As System.String = DestinationIdentifierInfo.Item2
 
     If destinationId = "article-read" Then
         '===================================
         ' READ OPERATION
         '===================================
-        Dim searchConditionsComplete As New System.Collections.Generic.Dictionary(Of String, Object)
+        Dim searchConditionsComplete As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
         searchConditionsComplete.Add("ArticleId", DB.Global.CreateParameterCondition(
             "ArticleId", "ArticleId = :ArticleId", Nothing))
@@ -750,19 +750,19 @@ If DestinationIdentifierInfo.Item1 Then
         ' WRITE OPERATION (BATCH)
         '===================================
         Dim writeMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
-            New String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
+            New System.String() {"articleId", "title", "content", "category", "author", "rating", "viewCount", "likeCount", "isPublished", "isFeatured", "tags"},
+            New System.String() {"ArticleId", "Title", "Content", "Category", "Author", "Rating", "ViewCount", "LikeCount", "IsPublished", "IsFeatured", "Tags"},
             New Boolean() {True, True, False, False, False, False, False, False, False, False, False},
             Nothing,  ' No primary key array - using explicit keyFields parameter below
             New Object() {Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, 0, 0, 0, 0, Nothing}
         )
 
         Return DB.Global.ProcessActionLink(DB,
-            DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+            DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
             DB.Global.CreateBusinessLogicForBatchWriting(
                 "P_TestingTableArticles",
                 writeMappings,
-                New String() {"ArticleId"},
+                New System.String() {"ArticleId"},
                 True
             ),
             "Articles written",
@@ -772,7 +772,7 @@ If DestinationIdentifierInfo.Item1 Then
         '===================================
         ' STATISTICS OPERATION
         '===================================
-        Dim statsConditionsComplete As New System.Collections.Generic.Dictionary(Of String, Object)
+        Dim statsConditionsComplete As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
         statsConditionsComplete.Add("IsPublished", DB.Global.CreateParameterCondition(
             "IsPublished", "IsPublished = :IsPublished", Nothing))
@@ -794,19 +794,19 @@ If DestinationIdentifierInfo.Item1 Then
         ' INCREMENT VIEW COUNT
         '===================================
         Dim viewMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"articleId"},
-            New String() {"ArticleId"},
+            New System.String() {"articleId"},
+            New System.String() {"ArticleId"},
             New Boolean() {True},
             Nothing,  ' No primary key array - using explicit keyFields parameter below
             New Object() {Nothing}
         )
 
         Return DB.Global.ProcessActionLink(DB,
-            DB.Global.CreateValidator(New String() {"articleId"}),
+            DB.Global.CreateValidator(New System.String() {"articleId"}),
             DB.Global.CreateBusinessLogicForWriting(
                 "P_TestingTableArticles",
                 viewMappings,
-                New String() {"ArticleId"},
+                New System.String() {"ArticleId"},
                 True,
                 Nothing,
                 "UPDATE P_TestingTableArticles SET ViewCount = ViewCount + 1, LastModifiedDate = GETDATE() WHERE ArticleId = :ArticleId",
