@@ -511,6 +511,7 @@ Function CreateFieldMapping(
     jsonProp As String,
     sqlCol As String,
     Optional isRequired As Boolean = False,
+    Optional isPrimaryKey As Boolean = False,
     Optional defaultVal As Object = Nothing
 ) As FieldMapping
 ```
@@ -519,18 +520,18 @@ Function CreateFieldMapping(
 - `jsonProp`: JSON property name
 - `sqlCol`: SQL column name
 - `isRequired`: Whether field is required
+- `isPrimaryKey`: Whether field is a primary key (v2.1+)
 - `defaultVal`: Default value if not provided
 
 **Returns:** FieldMapping object
 
 **Example:**
 ```vb
-Dim mapping = DB.Global.CreateFieldMapping("userId", "USER_ID", True, Nothing)
-```
+' Basic field mapping
+Dim mapping = DB.Global.CreateFieldMapping("userId", "USER_ID", True, False, Nothing)
 
-**Note:** This factory function does not expose the `isPrimaryKey` parameter. To create field mappings with primary key declarations (v2.1+), use the FieldMapping constructor directly:
-```vb
-Dim pkMapping = New FieldMapping("userId", "USER_ID", True, True, Nothing)  ' isPrimaryKey = True
+' Field mapping with primary key declaration (v2.1+)
+Dim pkMapping = DB.Global.CreateFieldMapping("userId", "USER_ID", True, True, Nothing)
 ```
 
 ---
