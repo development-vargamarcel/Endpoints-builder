@@ -4,6 +4,7 @@ Complete reference for all functions in the Endpoint Library.
 
 ## Table of Contents
 
+- [Configuration Constants](#configuration-constants)
 - [Core Processing](#core-processing)
 - [Validation Functions](#validation-functions)
 - [Factory Functions](#factory-functions)
@@ -11,7 +12,45 @@ Complete reference for all functions in the Endpoint Library.
 - [Utility Functions](#utility-functions)
 - [Parameter Getters](#parameter-getters)
 - [Helper Functions](#helper-functions)
+- [Advanced Utility Functions](#advanced-utility-functions)
 - [Classes](#classes)
+
+---
+
+## Configuration Constants
+
+The library uses the following configuration constants (v2.2+):
+
+### MAX_BATCH_SIZE
+**Value:** `1000`
+
+Maximum number of records allowed in a single batch operation. Batch requests exceeding this limit will be rejected to prevent:
+- Denial of Service (DoS) attacks
+- Memory exhaustion
+- Database connection timeouts
+
+**Example Error:**
+```json
+{
+  "Result": "KO",
+  "Reason": "Batch size 1500 exceeds maximum allowed size of 1000. Please split into smaller batches."
+}
+```
+
+### MAX_SQL_IDENTIFIER_LENGTH
+**Value:** `128`
+
+Maximum length for SQL identifiers (table names, column names). This follows SQL Server's standard identifier length limit and is enforced by `ValidateSqlIdentifier` for security.
+
+### MAX_CACHE_SIZE
+**Value:** `1000`
+
+Maximum number of objects cached in the property name cache. When exceeded, the cache is cleared to prevent memory issues. The cache stores case-insensitive property name mappings for performance.
+
+### COMPOSITE_KEY_DELIMITER
+**Value:** `ASCII 31 (Unit Separator)`
+
+Internal delimiter used for composite key generation in batch operations. Uses a safe ASCII control character to prevent key collisions.
 
 ---
 
@@ -286,7 +325,9 @@ Function CreateBusinessLogicForReading(
     parameterConditions As Dictionary(Of String, Object),
     Optional defaultWhereClause As String = Nothing,
     Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing,
-    Optional useForJsonPath As Boolean = False
+    Optional useForJsonPath As Boolean = False,
+    Optional includeExecutedSQL As Boolean = True,
+    Optional prependSQL As String = Nothing
 ) As Func(Of Object, JObject, Object)
 ```
 
@@ -295,7 +336,9 @@ Function CreateBusinessLogicForReading(
 - `parameterConditions`: Dictionary of parameter conditions
 - `defaultWhereClause`: WHERE clause applied when no parameters provided
 - `fieldMappings`: Optional field mappings (JSON to SQL)
-- `useForJsonPath`: **NEW** If True, uses SQL Server's FOR JSON PATH for 40-60% better performance (default: False)
+- `useForJsonPath`: If True, uses SQL Server's FOR JSON PATH for 40-60% better performance (default: False)
+- `includeExecutedSQL`: **NEW (v2.2)** If True, includes the executed SQL in the response (default: True for backward compatibility)
+- `prependSQL`: **NEW (v2.2)** Optional SQL to prepend before the query (e.g., "SET DATEFORMAT ymd;" for session configuration)
 
 **Returns:** Business logic function
 
@@ -349,7 +392,23 @@ Dim fastLogic = DB.Global.CreateBusinessLogicForReading(
     conditions,
     "OrderDate >= DATEADD(day, -30, GETDATE())",
     Nothing,
-    True  ' FOR JSON PATH mode - 40-60% faster!
+    True,  ' FOR JSON PATH mode - 40-60% faster!
+    True,  ' Include executed SQL in response
+    Nothing ' No prepend SQL needed
+)
+```
+
+**Example (With Session Configuration via prependSQL):**
+```vb
+' Use prependSQL for session-level SQL configuration (v2.2+)
+Dim logic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT OrderId, CustomerId, OrderDate FROM Orders {WHERE}",
+    conditions,
+    Nothing,
+    Nothing,
+    False,
+    True,
+    "SET DATEFORMAT ymd;"  ' Prepend session config before query
 )
 ```
 
@@ -469,6 +528,11 @@ Function CreateFieldMapping(
 Dim mapping = DB.Global.CreateFieldMapping("userId", "USER_ID", True, Nothing)
 ```
 
+**Note:** This factory function does not expose the `isPrimaryKey` parameter. To create field mappings with primary key declarations (v2.1+), use the FieldMapping constructor directly:
+```vb
+Dim pkMapping = New FieldMapping("userId", "USER_ID", True, True, Nothing)  ' isPrimaryKey = True
+```
+
 ---
 
 ### CreateParameterConditionsDictionary
@@ -512,12 +576,17 @@ Function CreateFieldMappingsDictionary(
     jsonProps As String(),
     sqlCols As String(),
     Optional isRequiredArray As Boolean() = Nothing,
+    Optional isPrimaryKeyArray As Boolean() = Nothing,
     Optional defaultValArray As Object() = Nothing
 ) As Dictionary(Of String, FieldMapping)
 ```
 
 **Parameters:**
-- Parallel arrays for creating multiple mappings
+- `jsonProps`: Array of JSON property names
+- `sqlCols`: Array of SQL column names (must match jsonProps length)
+- `isRequiredArray`: Optional array indicating which fields are required
+- `isPrimaryKeyArray`: **NEW (v2.1)** Optional array indicating which fields are primary keys
+- `defaultValArray`: Optional array of default values
 
 **Returns:** Dictionary of field mappings
 
@@ -528,6 +597,18 @@ Dim mappings = DB.Global.CreateFieldMappingsDictionary(
     New String() {"USER_ID", "EMAIL_ADDRESS"},
     New Boolean() {True, True},
     Nothing
+)
+```
+
+**Example (With Primary Keys - v2.1+):**
+```vb
+' Declare userId as both required AND primary key
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"userId", "email", "name"},
+    New String() {"USER_ID", "EMAIL_ADDRESS", "NAME"},
+    New Boolean() {True, True, False},      ' isRequired
+    New Boolean() {True, False, False},     ' isPrimaryKey
+    Nothing                                  ' defaults
 )
 ```
 
@@ -734,6 +815,193 @@ Function ExecuteQueryToDictionary(
 
 ---
 
+## Advanced Utility Functions
+
+### GetPropertyCaseInsensitive
+
+Gets a property from JObject using case-insensitive matching with caching for performance.
+
+```vb
+Function GetPropertyCaseInsensitive(
+    obj As JObject,
+    propertyName As String
+) As JToken
+```
+
+**Returns:** Property value or Nothing if not found
+
+**Performance:** Uses cached property name mappings for 70-90% faster lookups in repeated operations.
+
+---
+
+### GetPropertyCacheStats
+
+Returns statistics about the property name cache for monitoring.
+
+```vb
+Function GetPropertyCacheStats() As Object
+```
+
+**Returns:** Object with properties:
+- `CacheSize`: Number of cached objects
+- `CacheHits`: Total cache hits
+- `CacheMisses`: Total cache misses
+- `HitRate`: Hit rate percentage
+
+**Example:**
+```vb
+Dim stats = DB.Global.GetPropertyCacheStats()
+' stats = { CacheSize: 150, CacheHits: 5000, CacheMisses: 200, HitRate: 96.15 }
+```
+
+---
+
+### ClearPropertyCache
+
+Clears the property name cache (useful for testing or memory management).
+
+```vb
+Sub ClearPropertyCache()
+```
+
+---
+
+### ValidateSqlIdentifier
+
+Validates SQL identifiers (table/column names) to prevent SQL injection.
+
+```vb
+Function ValidateSqlIdentifier(
+    identifier As String,
+    Optional allowBrackets As Boolean = True
+) As Boolean
+```
+
+**Parameters:**
+- `identifier`: SQL identifier to validate
+- `allowBrackets`: Allow SQL Server bracket notation `[TableName]`
+
+**Returns:** True if identifier is safe, False otherwise
+
+**Security Rules:**
+- Must start with letter or underscore
+- Can contain only alphanumeric, underscore, or dot (for schema.table)
+- Max length: 128 characters
+- No SQL injection keywords (--, /*, ;, quotes)
+
+---
+
+### ValidateAndGetSqlIdentifier
+
+Validates SQL identifier and throws exception if invalid.
+
+```vb
+Function ValidateAndGetSqlIdentifier(
+    identifier As String,
+    identifierType As String
+) As String
+```
+
+**Parameters:**
+- `identifier`: SQL identifier to validate
+- `identifierType`: Type description for error message (e.g., "table name", "column name")
+
+**Returns:** Validated identifier
+
+**Throws:** ArgumentException if identifier is invalid
+
+---
+
+### ExecuteQueryToJSON
+
+Executes query with FOR JSON PATH and returns JSON string directly from SQL Server.
+
+```vb
+Function ExecuteQueryToJSON(
+    database As Object,
+    sql As String,
+    parameters As Dictionary(Of String, Object),
+    Optional prependSQL As String = Nothing
+) As String
+```
+
+**Parameters:**
+- `database`: Database connection object
+- `sql`: SQL query (FOR JSON PATH appended automatically)
+- `parameters`: Query parameters
+- `prependSQL`: Optional SQL to prepend (e.g., "SET DATEFORMAT ymd;")
+
+**Returns:** JSON string with array of records
+
+**Performance:** 40-60% faster than ExecuteQueryToDictionary for simple queries
+
+**Edge Cases Handled:**
+- NULL/empty results: Returns "[]"
+- Special characters: Automatic escaping
+- Large result sets: Uses NVARCHAR(MAX)
+- JSON validation: Pre-validates structure
+
+---
+
+### EscapeColumnForJson
+
+Helper to escape text columns for safe FOR JSON PATH usage.
+
+```vb
+Function EscapeColumnForJson(
+    columnName As String,
+    Optional alias As String = Nothing,
+    Optional useStringEscape As Boolean = True
+) As String
+```
+
+**Parameters:**
+- `columnName`: SQL column name to wrap
+- `alias`: Optional alias for column in results
+- `useStringEscape`: Use STRING_ESCAPE (SQL 2016+) or REPLACE (SQL 2012)
+
+**Returns:** SQL expression that escapes special characters
+
+**Example:**
+```vb
+' Instead of: SELECT Description FROM Table
+' Use:
+Dim sql = "SELECT " & DB.Global.EscapeColumnForJson("Description") & " FROM Table"
+' Result (SQL 2016+): SELECT STRING_ESCAPE(Description, 'json') AS Description FROM Table
+```
+
+---
+
+### BuildSafeColumnList
+
+Builds a safe column list for SELECT with automatic escaping for text columns.
+
+```vb
+Function BuildSafeColumnList(
+    columns As String(),
+    Optional textColumns As String() = Nothing,
+    Optional useStringEscape As Boolean = True
+) As String
+```
+
+**Parameters:**
+- `columns`: Array of column names
+- `textColumns`: Columns containing text that need escaping
+- `useStringEscape`: Use STRING_ESCAPE (SQL 2016+) or REPLACE
+
+**Returns:** Comma-separated column list with escaping applied
+
+**Example:**
+```vb
+Dim cols = DB.Global.BuildSafeColumnList(
+    New String() {"ID", "Name", "Description"},
+    New String() {"Description"}  ' Escape Description field
+)
+' Returns: "ID, Name, STRING_ESCAPE(ISNULL(CAST(Description AS NVARCHAR(MAX)), ''), 'json') AS Description"
+```
+
+---
+
 ## Classes
 
 ### ParameterCondition
@@ -768,6 +1036,7 @@ Maps JSON property to SQL column.
 - `JsonProperty As String`
 - `SqlColumn As String`
 - `IsRequired As Boolean`
+- `IsPrimaryKey As Boolean` (v2.1+)
 - `DefaultValue As Object`
 
 **Constructor:**
@@ -776,9 +1045,12 @@ Public Sub New(
     jsonProp As String,
     sqlCol As String,
     Optional isRequired As Boolean = False,
+    Optional isPrimaryKey As Boolean = False,
     Optional defaultVal As Object = Nothing
 )
 ```
+
+**Note:** The `IsPrimaryKey` property (added in v2.1) allows you to declare primary keys directly in field mappings. When specified, the library can automatically extract key fields without needing to pass them separately to write functions.
 
 ---
 
