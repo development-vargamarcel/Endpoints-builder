@@ -264,7 +264,8 @@ Function CreateBusinessLogicForReading(
     Optional defaultWhereClause As String = Nothing,
     Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing,
     Optional useForJsonPath As Boolean = False,
-    Optional includeExecutedSQL As Boolean = True
+    Optional includeExecutedSQL As Boolean = True,
+    Optional prependSQL As String = Nothing
 ) As Func(Of Object, JObject, Object)
 ```
 Creates advanced read logic with custom SQL and parameter conditions.
@@ -276,6 +277,7 @@ Creates advanced read logic with custom SQL and parameter conditions.
 - `fieldMappings`: JSON-to-SQL field mappings (optional)
 - `useForJsonPath`: If True, uses FOR JSON PATH for better performance (optional, default: False)
 - `includeExecutedSQL`: If True, includes executed SQL in response (optional, default: True)
+- `prependSQL`: SQL to prepend at the beginning of the query (e.g., "SET DATEFORMAT ymd;") (optional, **NEW in v2.2**)
 
 #### CreateAdvancedBusinessLogicForWriting
 ```vb
@@ -347,6 +349,7 @@ See the `examples/` directory for **advanced, production-ready examples**:
 - **AdvancedSecurityPatterns.vb**: Comprehensive security implementation with 11 security controls
 - **AdvancedPrimaryKeyExample.vb**: Primary key declaration in field mappings (v2.1+ feature)
 - **AdvancedFieldMappingExample.vb**: 10 comprehensive field mapping scenarios
+- **RobustnessImprovementsExample.vb**: Security and robustness features with 10 examples (v2.2+ features)
 
 ### 📄 Supporting Files
 
@@ -469,11 +472,54 @@ Dim logic = DB.Global.CreateBusinessLogicForWriting("OrderItems", compositeMappi
 
 See `examples/PrimaryKeyDeclarationExample.vb` for comprehensive examples.
 
+### Query Prepending (v2.2)
+
+**NEW**: You can now prepend SQL statements to queries for setting session-level options before execution.
+
+```vb
+' Prepend SET DATEFORMAT to ensure consistent date parsing
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT OrderId, OrderDate, Amount FROM Orders {WHERE}",
+    searchConditions,
+    Nothing,                    ' defaultWhereClause
+    Nothing,                    ' fieldMappings
+    True,                       ' useForJsonPath
+    False,                      ' includeExecutedSQL
+    "SET DATEFORMAT ymd;"       ' prependSQL - prepended to query
+)
+
+' Multiple SET statements
+Dim readLogicMultiple = DB.Global.CreateBusinessLogicForReading(
+    "SELECT * FROM TempData {WHERE}",
+    searchConditions,
+    Nothing,
+    Nothing,
+    False,
+    True,
+    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' Multiple statements
+)
+```
+
+**Common Use Cases:**
+- `SET DATEFORMAT ymd;` - Ensure consistent date parsing across different server locales
+- `SET NOCOUNT ON;` - Suppress "rows affected" messages for performance
+- `SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;` - Read uncommitted data (dirty reads)
+- `SET LOCK_TIMEOUT 5000;` - Set lock timeout to 5 seconds
+- `SET ARITHABORT ON;` - Control arithmetic error handling
+
+**Benefits:**
+- Ensures consistent behavior across different server configurations
+- Eliminates date parsing issues with international formats
+- Improves performance with NOCOUNT ON
+- Session-specific settings without affecting other connections
+
+See `examples/RobustnessImprovementsExample.vb` for comprehensive examples.
+
 ### Custom SQL with Placeholders
 
 ```vb
 Dim sql = "SELECT * FROM Users {WHERE} ORDER BY CreatedDate DESC"
-' {WHERE} will be replaced with generated WHERE clause
+' {WHERE} will be replaced with generated WHERE clause (case-insensitive)
 ```
 
 ### Conditional Parameters

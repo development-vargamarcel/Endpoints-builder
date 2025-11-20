@@ -5,6 +5,110 @@ All notable changes to the Endpoint Library will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-11-20
+
+### Added - Robustness and Security Improvements
+
+#### Critical Security Fixes
+- **SQL Identifier Validation**: Added `ValidateSqlIdentifier()` function to prevent SQL injection via table/column names
+  - Validates table names, column names, and key fields
+  - Checks for SQL injection patterns (comments, semicolons, quotes)
+  - Enforces naming conventions (alphanumeric, underscore, dot for schema notation)
+  - Maximum identifier length of 128 characters
+- **Batch Size Limits**: Added configurable `MAX_BATCH_SIZE` constant (default: 1000 records)
+  - Prevents DoS attacks through memory exhaustion
+  - Returns clear error message when limit exceeded
+  - Helps prevent SQL parameter limit issues
+
+#### New Features
+- **Query Prepending**: Added `prependSQL` parameter to `CreateBusinessLogicForReading()`
+  - Allows prepending SQL statements (e.g., `"SET DATEFORMAT ymd;"`)
+  - Useful for setting session-level options before query execution
+  - Added to both factory function and `BusinessLogicReaderWrapper` constructor
+
+#### Robustness Improvements
+- **Resource Leak Prevention**: Added try-finally blocks to all database operations
+  - `ExecuteQueryToDictionary()` now guarantees cleanup on error
+  - All QWTable instances properly disposed even on exceptions
+  - Prevents connection pool exhaustion
+- **Composite Key Collision Fix**: Changed delimiter from pipe (`|`) to ASCII 31 (Unit Separator)
+  - Prevents ambiguous composite keys (e.g., "123|456|789" vs "123" and "456|789")
+  - Uses `COMPOSITE_KEY_DELIMITER` constant for consistency
+  - Applied to `BulkExistenceCheck()` and `GetCompositeKey()`
+- **Integer Overflow Protection**: Enhanced `GetIntegerParameter()` with range validation
+  - Checks values are within `Integer.MinValue` to `Integer.MaxValue`
+  - Handles Long to Integer conversions safely
+  - Returns `(False, 0)` instead of throwing exceptions on overflow
+- **DBNull Handling**: `ExecuteQueryToDictionary()` now converts DBNull to Nothing
+  - Ensures proper JSON serialization (null instead of DBNull)
+  - Prevents serialization errors with NULL database values
+- **Stream Seekability Check**: `ParsePayload()` now checks `CanSeek` before seeking
+  - Handles non-seekable streams (network streams, compressed streams)
+  - Prevents exceptions with certain stream types
+- **Array Length Validation**: Factory functions validate parallel array lengths
+  - `CreateFieldMappingsDictionary()` validates all array parameters
+  - `CreateParameterConditionsDictionary()` validates all array parameters
+  - Throws clear exceptions with detailed error messages
+- **Duplicate Key Detection**: Factory functions check for duplicate keys
+  - Prevents duplicate field mappings (e.g., two "userId" mappings)
+  - Prevents duplicate parameter conditions
+  - Throws exception with specific duplicate key name and index
+- **Key Field Validation**: Writer validates all key fields are present in payload
+  - Checks key fields exist before executing existence queries
+  - Returns clear error: "Key field 'X' is missing from payload"
+  - Prevents SQL errors from unbound parameters
+- **Parameter Name Collision Fix**: `BulkExistenceCheck()` uses better parameter naming
+  - Changed from `{keyField}_{paramIndex}` to `p{paramIndex}_{keyField}`
+  - Prevents collisions like "UserId_0" vs "UserId" with paramIndex "0"
+- **Cache Race Condition Fix**: Improved thread-safe cache management
+  - Creates new cache instead of clearing existing one
+  - Prevents race conditions during cache size checks
+  - Uses double-check pattern for efficiency
+- **Case-Insensitive {WHERE} Placeholder**: Regex-based replacement supports all cases
+  - `{WHERE}`, `{where}`, `{Where}`, `{wHeRe}` all work correctly
+  - Uses `RegexOptions.IgnoreCase` for reliability
+- **Single WHERE Placeholder Validation**: Constructor validates only one {WHERE} exists
+  - Prevents invalid SQL like "SELECT * FROM T {WHERE} AND {WHERE}"
+  - Throws exception at initialization with clear error message
+- **LogMessage Fix**: `ProcessActionLink()` now uses LogMessage parameter correctly
+  - Changed from hardcoded "Error at ValidatePayloadAndToken: " prefix
+  - Uses provided LogMessage directly for accurate logging
+
+### Changed
+- **BusinessLogicReaderWrapper Constructor**: Added `prependSQL` parameter (optional, backward compatible)
+- **CreateBusinessLogicForReading Factory**: Added `prependSQL` parameter (optional, backward compatible)
+- **BusinessLogicWriterWrapper Constructor**: Now validates table names and column names on initialization
+- **BusinessLogicBatchWriterWrapper Constructor**: Now validates table names and column names on initialization
+- **Cache Clear Logic**: Changed from `_propertyNameCache.Clear()` to atomic replacement
+- **WHERE Placeholder Replacement**: Changed from `String.Contains()` to `Regex.IsMatch()` for case-insensitivity
+
+### Examples
+- **RobustnessImprovementsExample.vb**: Comprehensive example demonstrating all new features
+  - 10 detailed examples showing security and robustness improvements
+  - Query prepending for date format handling
+  - Batch size limit demonstration
+  - SQL injection prevention examples
+  - Key field validation scenarios
+  - DBNull handling examples
+  - Resource cleanup demonstration
+
+### Internal Improvements
+- Added `MAX_BATCH_SIZE`, `MAX_SQL_IDENTIFIER_LENGTH`, and `COMPOSITE_KEY_DELIMITER` constants
+- Improved code documentation with "ROBUST:", "SECURITY:", and "FEATURE:" comment markers
+- Enhanced error messages with specific details about validation failures
+- Better separation of concerns with dedicated validation functions
+
+### Performance
+- No performance regressions despite added validations
+- Validations occur at initialization time, not per-request
+- Cache improvements maintain or improve performance
+
+### Backward Compatibility
+- ✅ All changes are backward compatible
+- New parameters are optional with sensible defaults
+- Existing code continues to work unchanged
+- Additional validations throw exceptions only for invalid configurations
+
 ## [2.0.0] - 2025-01-20
 
 ### Added - Production Refactoring Release

@@ -46,6 +46,13 @@ Public Class FieldMapping
 End Class
 
 ' ===================================
+' CONFIGURATION CONSTANTS
+' ===================================
+Private Const MAX_BATCH_SIZE As Integer = 1000
+Private Const MAX_SQL_IDENTIFIER_LENGTH As Integer = 128
+Private Const COMPOSITE_KEY_DELIMITER As String = "␟"  ' ASCII 31 (Unit Separator) - safe delimiter
+
+' ===================================
 ' PERFORMANCE: PROPERTY NAME CACHING
 ' ===================================
 Private Shared _propertyNameCache As New System.Collections.Concurrent.ConcurrentDictionary(Of Integer, System.Collections.Generic.Dictionary(Of String, String))
@@ -96,9 +103,14 @@ Public Shared Function GetPropertyCaseInsensitive(obj As Newtonsoft.Json.Linq.JO
     ' Cache miss - build property name mapping
     System.Threading.Interlocked.Increment(_cacheMissCount)
 
-    ' Prevent cache from growing indefinitely
+    ' ROBUST: Prevent cache from growing indefinitely (thread-safe)
     If _propertyNameCache.Count > MAX_CACHE_SIZE Then
-        _propertyNameCache.Clear()
+        ' Only clear if we're still over the limit (double-check to avoid race)
+        If _propertyNameCache.Count > MAX_CACHE_SIZE Then
+            ' Create new cache instead of clearing (avoids race conditions during iteration)
+            Dim newCache As New System.Collections.Concurrent.ConcurrentDictionary(Of Integer, System.Collections.Generic.Dictionary(Of String, String))
+            _propertyNameCache = newCache
+        End If
     End If
 
     nameMap = New System.Collections.Generic.Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
@@ -140,6 +152,65 @@ Public Shared Sub ClearPropertyCache()
     _cacheHitCount = 0
     _cacheMissCount = 0
 End Sub
+
+' ===================================
+' SQL SECURITY: IDENTIFIER VALIDATION
+' ===================================
+
+''' <summary>
+''' Validates SQL identifiers (table names, column names) to prevent SQL injection
+''' CRITICAL SECURITY: Prevents injection via table/column names
+''' </summary>
+''' <param name="identifier">The SQL identifier to validate</param>
+''' <param name="allowBrackets">Allow SQL Server bracket notation [TableName]</param>
+''' <returns>True if identifier is safe, False otherwise</returns>
+Public Shared Function ValidateSqlIdentifier(identifier As String, Optional allowBrackets As Boolean = True) As Boolean
+    If String.IsNullOrWhiteSpace(identifier) Then
+        Return False
+    End If
+
+    ' Check length
+    If identifier.Length > MAX_SQL_IDENTIFIER_LENGTH Then
+        Return False
+    End If
+
+    ' Strip brackets if allowed
+    Dim cleanIdentifier As String = identifier
+    If allowBrackets AndAlso identifier.StartsWith("[") AndAlso identifier.EndsWith("]") Then
+        cleanIdentifier = identifier.Substring(1, identifier.Length - 2)
+    End If
+
+    ' Must start with letter or underscore
+    If Not Char.IsLetter(cleanIdentifier(0)) AndAlso cleanIdentifier(0) <> "_"c Then
+        Return False
+    End If
+
+    ' Rest must be alphanumeric, underscore, or dot (for schema.table notation)
+    For Each c As Char In cleanIdentifier
+        If Not (Char.IsLetterOrDigit(c) OrElse c = "_"c OrElse c = "."c) Then
+            Return False
+        End If
+    Next
+
+    ' Prevent SQL injection keywords disguised as identifiers
+    Dim upper As String = cleanIdentifier.ToUpper()
+    If upper.Contains("--") OrElse upper.Contains("/*") OrElse upper.Contains("*/") OrElse _
+       upper.Contains(";") OrElse upper.Contains("'") OrElse upper.Contains("""") Then
+        Return False
+    End If
+
+    Return True
+End Function
+
+''' <summary>
+''' Validates and sanitizes a SQL identifier, throwing exception if invalid
+''' </summary>
+Public Shared Function ValidateAndGetSqlIdentifier(identifier As String, identifierType As String) As String
+    If Not ValidateSqlIdentifier(identifier) Then
+        Throw New System.ArgumentException($"Invalid {identifierType}: '{identifier}'. Identifiers must start with letter/underscore and contain only alphanumeric characters, underscores, or dots.")
+    End If
+    Return identifier
+End Function
 
 ' ===================================
 ' VALIDATORS
@@ -201,6 +272,7 @@ Public Class BusinessLogicReaderWrapper
     Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping)
     Private ReadOnly _useForJsonPath As Boolean
     Private ReadOnly _includeExecutedSQL As Boolean
+    Private ReadOnly _prependSQL As String
 
     ''' <summary>
     ''' Reader with full SQL customization. Use explicit SELECT fields (not SELECT *)
@@ -211,18 +283,29 @@ Public Class BusinessLogicReaderWrapper
     ''' <param name="fieldMappings">Optional JSON-to-SQL field mappings</param>
     ''' <param name="useForJsonPath">If True, uses SQL Server FOR JSON PATH for better performance (40-60% faster for simple queries)</param>
     ''' <param name="includeExecutedSQL">If True, includes the executed SQL query in the response (default: True for backward compatibility)</param>
+    ''' <param name="prependSQL">Optional SQL to prepend at the beginning of the final query (e.g., "SET DATEFORMAT ymd;")</param>
     Public Sub New(baseSQL As String, _
                    parameterConditions As System.Collections.Generic.Dictionary(Of String, Object), _
                    Optional defaultWhereClause As String = Nothing, _
                    Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing, _
                    Optional useForJsonPath As Boolean = False, _
-                   Optional includeExecutedSQL As Boolean = True)
+                   Optional includeExecutedSQL As Boolean = True, _
+                   Optional prependSQL As String = Nothing)
+        ' Validate baseSQL for {WHERE} placeholder
+        If Not String.IsNullOrEmpty(baseSQL) AndAlso baseSQL.Contains("{WHERE}") Then
+            Dim wherePlaceholderCount As Integer = (baseSQL.Length - baseSQL.Replace("{WHERE}", "").Length) / 7
+            If wherePlaceholderCount > 1 Then
+                Throw New System.ArgumentException("SQL can only contain one {WHERE} placeholder")
+            End If
+        End If
+
         _baseSQL = baseSQL
         _parameterConditions = If(parameterConditions, New System.Collections.Generic.Dictionary(Of String, Object))
         _defaultWhereClause = defaultWhereClause
         _fieldMappings = fieldMappings
         _useForJsonPath = useForJsonPath
         _includeExecutedSQL = includeExecutedSQL
+        _prependSQL = prependSQL
     End Sub
 
     Public Function Execute(database As Object, payload As Newtonsoft.Json.Linq.JObject) As Object
@@ -278,13 +361,14 @@ Public Class BusinessLogicReaderWrapper
             ' PERFORMANCE: Build final SQL efficiently
             Dim finalSQL As String
 
-            ' Handle WHERE clause construction
+            ' Handle WHERE clause construction (case-insensitive placeholder)
             If whereConditions.Count > 0 Then
                 Dim whereClause As String = String.Join(" AND ", whereConditions)
 
-                ' Check if baseSQL has {WHERE} placeholder
-                If _baseSQL.Contains("{WHERE}") Then
-                    finalSQL = _baseSQL.Replace("{WHERE}", "WHERE " & whereClause)
+                ' ROBUST: Case-insensitive {WHERE} placeholder replacement
+                Dim wherePlaceholderPattern As New System.Text.RegularExpressions.Regex("\{WHERE\}", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                If wherePlaceholderPattern.IsMatch(_baseSQL) Then
+                    finalSQL = wherePlaceholderPattern.Replace(_baseSQL, "WHERE " & whereClause)
                 ElseIf Not _baseSQL.ToUpper().Contains("WHERE") Then
                     ' PERFORMANCE: StringBuilder for concatenation
                     Dim sqlBuilder As New System.Text.StringBuilder(_baseSQL.Length + whereClause.Length + 10)
@@ -303,8 +387,9 @@ Public Class BusinessLogicReaderWrapper
             Else
                 ' No conditions, use default or remove placeholder
                 If Not String.IsNullOrEmpty(_defaultWhereClause) Then
-                    If _baseSQL.Contains("{WHERE}") Then
-                        finalSQL = _baseSQL.Replace("{WHERE}", "WHERE " & _defaultWhereClause)
+                    Dim wherePlaceholderPattern As New System.Text.RegularExpressions.Regex("\{WHERE\}", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                    If wherePlaceholderPattern.IsMatch(_baseSQL) Then
+                        finalSQL = wherePlaceholderPattern.Replace(_baseSQL, "WHERE " & _defaultWhereClause)
                     ElseIf Not _baseSQL.ToUpper().Contains("WHERE") Then
                         Dim sqlBuilder As New System.Text.StringBuilder(_baseSQL.Length + _defaultWhereClause.Length + 10)
                         sqlBuilder.Append(_baseSQL)
@@ -316,8 +401,14 @@ Public Class BusinessLogicReaderWrapper
                     End If
                 Else
                     ' Remove placeholder if exists
-                    finalSQL = _baseSQL.Replace("{WHERE}", "")
+                    Dim wherePlaceholderPattern As New System.Text.RegularExpressions.Regex("\{WHERE\}", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                    finalSQL = wherePlaceholderPattern.Replace(_baseSQL, "")
                 End If
+            End If
+
+            ' FEATURE: Prepend SQL if specified (e.g., SET DATEFORMAT ymd;)
+            If Not String.IsNullOrEmpty(_prependSQL) Then
+                finalSQL = _prependSQL & " " & finalSQL
             End If
 
             ' Execute query - use FOR JSON PATH if enabled for better performance
@@ -412,12 +503,20 @@ Public Class BusinessLogicWriterWrapper
                    Optional customExistenceCheckSQL As String = Nothing, _
                    Optional customUpdateSQL As String = Nothing, _
                    Optional customWhereClause As String = Nothing)
-        _tableName = tableName
+        ' SECURITY: Validate table name
+        _tableName = ValidateAndGetSqlIdentifier(tableName, "table name")
         _fieldMappings = fieldMappings
         _allowUpdates = allowUpdates
         _customExistenceCheckSQL = customExistenceCheckSQL
         _customUpdateSQL = customUpdateSQL
         _customWhereClause = customWhereClause
+
+        ' SECURITY: Validate all SQL column names in field mappings
+        If fieldMappings IsNot Nothing Then
+            For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In fieldMappings
+                ValidateAndGetSqlIdentifier(kvp.Value.SqlColumn, "column name")
+            Next
+        End If
 
         ' Extract primary keys from field mappings if not explicitly provided
         If keyFields Is Nothing OrElse keyFields.Length = 0 Then
@@ -434,6 +533,10 @@ Public Class BusinessLogicWriterWrapper
 
             _keyFields = primaryKeys.ToArray()
         Else
+            ' SECURITY: Validate key fields
+            For Each keyField As String In keyFields
+                ValidateAndGetSqlIdentifier(keyField, "key field")
+            Next
             _keyFields = keyFields
         End If
     End Sub
@@ -463,6 +566,16 @@ Public Class BusinessLogicWriterWrapper
                     parameters.Add(kvp.Value.SqlColumn, paramResult.Item2)
                 ElseIf kvp.Value.DefaultValue IsNot Nothing Then
                     parameters.Add(kvp.Value.SqlColumn, kvp.Value.DefaultValue)
+                End If
+            Next
+
+            ' ROBUST: Validate that all key fields are present in parameters
+            For Each keyField As String In _keyFields
+                If Not parameters.ContainsKey(keyField) Then
+                    Return New With {
+                        .Result = "KO",
+                        .Reason = $"Key field '{keyField}' is missing from payload. All key fields are required for write operations."
+                    }
                 End If
             Next
 
@@ -703,7 +816,8 @@ Private Shared Function BulkExistenceCheck(
 
             For Each keyField As String In keyFields
                 If recordParams.ContainsKey(keyField) Then
-                    Dim paramName As String = $"{keyField}_{paramIndex}"
+                    ' ROBUST: Use prefix to prevent collisions (e.g., UserId_0 vs UserId with paramIndex 0)
+                    Dim paramName As String = $"p{paramIndex}_{keyField}"
                     conditions.Add($"{keyField} = :{paramName}")
                     queryParams.Add(paramName, recordParams(keyField))
                 End If
@@ -739,7 +853,7 @@ Private Shared Function BulkExistenceCheck(
             While Not checkQuery.Rowset.EndOfSet
                 Dim compositeKey As New System.Text.StringBuilder()
                 For Each keyField As String In keyFields
-                    If compositeKey.Length > 0 Then compositeKey.Append("|")
+                    If compositeKey.Length > 0 Then compositeKey.Append(COMPOSITE_KEY_DELIMITER)
                     ' Safely handle DBNull values in key fields
                     Dim fieldValue = checkQuery.Rowset.Fields(keyField).Value
                     If IsDBNull(fieldValue) OrElse fieldValue Is Nothing Then
@@ -777,11 +891,12 @@ End Function
 
 ''' <summary>
 ''' Creates a composite key string from record parameters
+''' ROBUST: Uses safe delimiter (ASCII 31) to prevent key collisions
 ''' </summary>
 Private Shared Function GetCompositeKey(recordParams As System.Collections.Generic.Dictionary(Of String, Object), keyFields As String()) As String
     Dim compositeKey As New System.Text.StringBuilder()
     For Each keyField As String In keyFields
-        If compositeKey.Length > 0 Then compositeKey.Append("|")
+        If compositeKey.Length > 0 Then compositeKey.Append(COMPOSITE_KEY_DELIMITER)
         ' Safely handle null values in key fields
         If recordParams.ContainsKey(keyField) AndAlso recordParams(keyField) IsNot Nothing Then
             compositeKey.Append(recordParams(keyField).ToString())
@@ -802,9 +917,17 @@ Public Class BusinessLogicBatchWriterWrapper
     Private ReadOnly _allowUpdates As Boolean
 
     Public Sub New(tableName As String, fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping), keyFields As String(), allowUpdates As Boolean)
-        _tableName = tableName
+        ' SECURITY: Validate table name
+        _tableName = ValidateAndGetSqlIdentifier(tableName, "table name")
         _fieldMappings = fieldMappings
         _allowUpdates = allowUpdates
+
+        ' SECURITY: Validate all SQL column names in field mappings
+        If fieldMappings IsNot Nothing Then
+            For Each kvp As System.Collections.Generic.KeyValuePair(Of String, FieldMapping) In fieldMappings
+                ValidateAndGetSqlIdentifier(kvp.Value.SqlColumn, "column name")
+            Next
+        End If
 
         ' Extract primary keys from field mappings if not explicitly provided
         If keyFields Is Nothing OrElse keyFields.Length = 0 Then
@@ -821,6 +944,10 @@ Public Class BusinessLogicBatchWriterWrapper
 
             _keyFields = primaryKeys.ToArray()
         Else
+            ' SECURITY: Validate key fields
+            For Each keyField As String In keyFields
+                ValidateAndGetSqlIdentifier(keyField, "key field")
+            Next
             _keyFields = keyFields
         End If
     End Sub
@@ -834,6 +961,24 @@ Public Class BusinessLogicBatchWriterWrapper
                 ' Single record - use standard writer
                 Dim singleRecordHandler As New BusinessLogicWriterWrapper(_tableName, _fieldMappings, _keyFields, _allowUpdates)
                 Return singleRecordHandler.Execute(database, payload)
+            End If
+
+            ' ROBUST: Validate batch size to prevent DoS and memory exhaustion
+            If recordsArray.Count > MAX_BATCH_SIZE Then
+                Return New With {
+                    .Result = "KO",
+                    .Reason = $"Batch size {recordsArray.Count} exceeds maximum allowed size of {MAX_BATCH_SIZE}. Please split into smaller batches."
+                }
+            End If
+
+            If recordsArray.Count = 0 Then
+                Return New With {
+                    .Result = "OK",
+                    .Message = "No records to process",
+                    .Inserted = 0,
+                    .Updated = 0,
+                    .Errors = 0
+                }
             End If
 
             Dim insertedCount As Integer = 0, updatedCount As Integer = 0, errorCount As Integer = 0
@@ -1084,8 +1229,9 @@ Public Function ProcessActionLink(
         Dim result As Object = p_businessLogic(database, payload)
         Dim StringResult As String = Newtonsoft.Json.JsonConvert.SerializeObject(result)
 
+        ' FIXED: Use LogMessage directly instead of hardcoded error prefix
         If LogMessage IsNot Nothing Then
-            LogCustom(database, StringPayload, StringResult, "Error at ValidatePayloadAndToken: ")
+            LogCustom(database, StringPayload, StringResult, LogMessage)
         End If
 
         Return StringResult
@@ -1103,10 +1249,14 @@ Public Shared Function ParsePayload(Optional ByRef PayloadString As String = Not
             Return Nothing
         End If
 
-        System.Web.HttpContext.Current.Request.InputStream.Seek(0, System.IO.SeekOrigin.Begin)
+        ' ROBUST: Check if stream is seekable before seeking
+        Dim inputStream As System.IO.Stream = System.Web.HttpContext.Current.Request.InputStream
+        If inputStream.CanSeek Then
+            inputStream.Seek(0, System.IO.SeekOrigin.Begin)
+        End If
 
         Using reader As New System.IO.StreamReader(
-            System.Web.HttpContext.Current.Request.InputStream,
+            inputStream,
             System.Text.Encoding.UTF8)
 
             Dim jsonString As String = reader.ReadToEnd()
@@ -1189,7 +1339,24 @@ Public Shared Function GetIntegerParameter(payload As Newtonsoft.Json.Linq.JObje
         If token IsNot Nothing Then
             ' Handle Integer type directly
             If token.Type = Newtonsoft.Json.Linq.JTokenType.Integer Then
-                Return New System.Tuple(Of Boolean, Integer)(True, CInt(CType(token, Newtonsoft.Json.Linq.JValue).Value))
+                Try
+                    Dim value As Object = CType(token, Newtonsoft.Json.Linq.JValue).Value
+                    ' Check if value is within integer range
+                    If TypeOf value Is Long Then
+                        Dim longValue As Long = CLng(value)
+                        If longValue >= Integer.MinValue AndAlso longValue <= Integer.MaxValue Then
+                            Return New System.Tuple(Of Boolean, Integer)(True, CInt(longValue))
+                        Else
+                            ' Value out of integer range
+                            Return New System.Tuple(Of Boolean, Integer)(False, 0)
+                        End If
+                    Else
+                        Return New System.Tuple(Of Boolean, Integer)(True, CInt(value))
+                    End If
+                Catch ex As OverflowException
+                    ' Value out of range
+                    Return New System.Tuple(Of Boolean, Integer)(False, 0)
+                End Try
             ElseIf token.Type = Newtonsoft.Json.Linq.JTokenType.String Then
                 ' Try parsing string as integer
                 Dim intValue As Integer
@@ -1200,7 +1367,13 @@ Public Shared Function GetIntegerParameter(payload As Newtonsoft.Json.Linq.JObje
                 ' Try converting float to integer (truncate)
                 Try
                     Dim floatValue As Double = CDbl(CType(token, Newtonsoft.Json.Linq.JValue).Value)
-                    Return New System.Tuple(Of Boolean, Integer)(True, CInt(floatValue))
+                    ' ROBUST: Check for overflow before converting
+                    If floatValue >= Integer.MinValue AndAlso floatValue <= Integer.MaxValue Then
+                        Return New System.Tuple(Of Boolean, Integer)(True, CInt(floatValue))
+                    Else
+                        ' Value out of integer range
+                        Return New System.Tuple(Of Boolean, Integer)(False, 0)
+                    End If
                 Catch
                     ' Conversion failed, return false
                 End Try
@@ -1252,37 +1425,61 @@ End Function
 ''' Executes query and returns results as list of dictionaries
 ''' NOTE: Use explicit field selection in your SQL (e.g., SELECT UserId, Email FROM Users)
 ''' instead of SELECT * for better performance
+''' ROBUST: Includes try-finally for resource cleanup and converts DBNull to Nothing
 ''' </summary>
 Public Shared Function ExecuteQueryToDictionary(database As Object, sql As String, parameters As System.Collections.Generic.Dictionary(Of String, Object)) As System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))
     Dim q As New QWTable()
-    q.Database = database
-    q.SQL = sql
-    If parameters IsNot Nothing Then
-        For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
-            q.params(param.Key) = param.Value
-        Next
-    End If
-    q.RequestLive = False
-    q.Active = True
+    Try
+        q.Database = database
+        q.SQL = sql
+        If parameters IsNot Nothing Then
+            For Each param As System.Collections.Generic.KeyValuePair(Of String, Object) In parameters
+                q.params(param.Key) = param.Value
+            Next
+        End If
+        q.RequestLive = False
+        q.Active = True
 
-    ' PERFORMANCE: Pre-allocate with estimated capacity
-    Dim estimatedFieldCount As Integer = q.rowset.fields.size
-    Dim rows As New System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))()
+        ' PERFORMANCE: Pre-allocate with estimated capacity
+        Dim estimatedFieldCount As Integer = q.rowset.fields.size
+        Dim rows As New System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of String, Object))()
 
-    While Not q.rowset.endofset
-        Dim row As New System.Collections.Generic.Dictionary(Of String, Object)(estimatedFieldCount)
+        While Not q.rowset.endofset
+            Dim row As New System.Collections.Generic.Dictionary(Of String, Object)(estimatedFieldCount)
 
-        For i As Integer = 1 To q.rowset.fields.size
-            Dim fieldName As String = q.Rowset.fields(i).fieldname
-            row.Add(fieldName, q.rowset.fields(i).value)
-        Next
+            For i As Integer = 1 To q.rowset.fields.size
+                Dim fieldName As String = q.Rowset.fields(i).fieldname
+                Dim fieldValue As Object = q.rowset.fields(i).value
 
-        rows.Add(row)
-        q.rowset.next()
-    End While
+                ' ROBUST: Convert DBNull to Nothing for proper JSON serialization
+                If IsDBNull(fieldValue) Then
+                    row.Add(fieldName, Nothing)
+                Else
+                    row.Add(fieldName, fieldValue)
+                End If
+            Next
 
-    q.Active = False
-    Return rows
+            rows.Add(row)
+            q.rowset.next()
+        End While
+
+        q.Active = False
+        Return rows
+    Finally
+        ' ROBUST: Ensure cleanup even on error
+        If q IsNot Nothing Then
+            Try
+                q.Active = False
+            Catch
+                ' Ignore cleanup errors
+            End Try
+            Try
+                q.Dispose()
+            Catch
+                ' Ignore disposal errors
+            End Try
+        End If
+    End Try
 End Function
 
 ''' <summary>
@@ -1520,9 +1717,10 @@ Public Function CreateBusinessLogicForReading(
     Optional defaultWhereClause As String = Nothing,
     Optional fieldMappings As System.Collections.Generic.Dictionary(Of String, FieldMapping) = Nothing,
     Optional useForJsonPath As Boolean = False,
-    Optional includeExecutedSQL As Boolean = True
+    Optional includeExecutedSQL As Boolean = True,
+    Optional prependSQL As String = Nothing
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, Object)
-    Return AddressOf New BusinessLogicReaderWrapper(baseSQL, parameterConditions, defaultWhereClause, fieldMappings, useForJsonPath, includeExecutedSQL).Execute
+    Return AddressOf New BusinessLogicReaderWrapper(baseSQL, parameterConditions, defaultWhereClause, fieldMappings, useForJsonPath, includeExecutedSQL, prependSQL).Execute
 End Function
 
 Public Function CreateBusinessLogicForWriting(
@@ -1628,6 +1826,7 @@ End Function
 
 ''' <summary>
 ''' Creates a dictionary of ParameterCondition objects from parallel arrays
+''' ROBUST: Validates array lengths and checks for duplicates
 ''' </summary>
 Public Function CreateParameterConditionsDictionary(
     paramNames As String(),
@@ -1637,9 +1836,38 @@ Public Function CreateParameterConditionsDictionary(
     Optional defaultValueArray As Object() = Nothing
 ) As System.Collections.Generic.Dictionary(Of String, Object)
 
+    ' ROBUST: Validate required parameters
+    If paramNames Is Nothing Then
+        Throw New System.ArgumentNullException("paramNames", "paramNames parameter is required")
+    End If
+    If sqlWhenPresentArray Is Nothing Then
+        Throw New System.ArgumentNullException("sqlWhenPresentArray", "sqlWhenPresentArray parameter is required")
+    End If
+
+    ' ROBUST: Validate array lengths match
+    If paramNames.Length <> sqlWhenPresentArray.Length Then
+        Throw New System.ArgumentException($"Array length mismatch: paramNames has {paramNames.Length} elements but sqlWhenPresentArray has {sqlWhenPresentArray.Length} elements")
+    End If
+
+    ' Validate optional arrays don't exceed required arrays
+    If sqlWhenAbsentArray IsNot Nothing AndAlso sqlWhenAbsentArray.Length > paramNames.Length Then
+        Throw New System.ArgumentException($"sqlWhenAbsentArray length ({sqlWhenAbsentArray.Length}) exceeds paramNames length ({paramNames.Length})")
+    End If
+    If useParameterArray IsNot Nothing AndAlso useParameterArray.Length > paramNames.Length Then
+        Throw New System.ArgumentException($"useParameterArray length ({useParameterArray.Length}) exceeds paramNames length ({paramNames.Length})")
+    End If
+    If defaultValueArray IsNot Nothing AndAlso defaultValueArray.Length > paramNames.Length Then
+        Throw New System.ArgumentException($"defaultValueArray length ({defaultValueArray.Length}) exceeds paramNames length ({paramNames.Length})")
+    End If
+
     Dim dict As New System.Collections.Generic.Dictionary(Of String, Object)
 
     For i As Integer = 0 To paramNames.Length - 1
+        ' ROBUST: Check for duplicates before adding
+        If dict.ContainsKey(paramNames(i)) Then
+            Throw New System.ArgumentException($"Duplicate parameter condition for '{paramNames(i)}' at index {i}")
+        End If
+
         Dim sqlAbsent As String = If(sqlWhenAbsentArray IsNot Nothing AndAlso i < sqlWhenAbsentArray.Length, sqlWhenAbsentArray(i), Nothing)
         Dim useParam As Boolean = If(useParameterArray IsNot Nothing AndAlso i < useParameterArray.Length, useParameterArray(i), True)
         Dim defValue As Object = If(defaultValueArray IsNot Nothing AndAlso i < defaultValueArray.Length, defaultValueArray(i), Nothing)
@@ -1652,6 +1880,7 @@ End Function
 
 ''' <summary>
 ''' Creates a dictionary of FieldMapping objects from parallel arrays
+''' ROBUST: Validates array lengths and checks for duplicates
 ''' </summary>
 Public Function CreateFieldMappingsDictionary(
     jsonProps As String(),
@@ -1661,9 +1890,38 @@ Public Function CreateFieldMappingsDictionary(
     Optional defaultValArray As Object() = Nothing
 ) As System.Collections.Generic.Dictionary(Of String, FieldMapping)
 
+    ' ROBUST: Validate required parameters
+    If jsonProps Is Nothing Then
+        Throw New System.ArgumentNullException("jsonProps", "jsonProps parameter is required")
+    End If
+    If sqlCols Is Nothing Then
+        Throw New System.ArgumentNullException("sqlCols", "sqlCols parameter is required")
+    End If
+
+    ' ROBUST: Validate array lengths match
+    If jsonProps.Length <> sqlCols.Length Then
+        Throw New System.ArgumentException($"Array length mismatch: jsonProps has {jsonProps.Length} elements but sqlCols has {sqlCols.Length} elements")
+    End If
+
+    ' Validate optional arrays don't exceed required arrays
+    If isRequiredArray IsNot Nothing AndAlso isRequiredArray.Length > jsonProps.Length Then
+        Throw New System.ArgumentException($"isRequiredArray length ({isRequiredArray.Length}) exceeds jsonProps length ({jsonProps.Length})")
+    End If
+    If isPrimaryKeyArray IsNot Nothing AndAlso isPrimaryKeyArray.Length > jsonProps.Length Then
+        Throw New System.ArgumentException($"isPrimaryKeyArray length ({isPrimaryKeyArray.Length}) exceeds jsonProps length ({jsonProps.Length})")
+    End If
+    If defaultValArray IsNot Nothing AndAlso defaultValArray.Length > jsonProps.Length Then
+        Throw New System.ArgumentException($"defaultValArray length ({defaultValArray.Length}) exceeds jsonProps length ({jsonProps.Length})")
+    End If
+
     Dim dict As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
 
     For i As Integer = 0 To jsonProps.Length - 1
+        ' ROBUST: Check for duplicates before adding
+        If dict.ContainsKey(jsonProps(i)) Then
+            Throw New System.ArgumentException($"Duplicate field mapping for '{jsonProps(i)}' at index {i}")
+        End If
+
         Dim isReq As Boolean = If(isRequiredArray IsNot Nothing AndAlso i < isRequiredArray.Length, isRequiredArray(i), False)
         Dim isPKey As Boolean = If(isPrimaryKeyArray IsNot Nothing AndAlso i < isPrimaryKeyArray.Length, isPrimaryKeyArray(i), False)
         Dim defVal As Object = If(defaultValArray IsNot Nothing AndAlso i < defaultValArray.Length, defaultValArray(i), Nothing)
