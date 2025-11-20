@@ -16,7 +16,7 @@ If PayloadError IsNot Nothing Then
 End If
 
 ' Create field mappings dictionary
-Dim fieldMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim fieldMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 ' Map JSON properties to SQL columns
 fieldMappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True, Nothing))
@@ -27,7 +27,7 @@ fieldMappings.Add("phoneNumber", DB.Global.CreateFieldMapping("phoneNumber", "PH
 fieldMappings.Add("department", DB.Global.CreateFieldMapping("department", "DEPT_CODE", False, "GENERAL"))
 
 ' Define key fields (using SQL column names)
-Dim keyFields = New String() {"USER_ID"}
+Dim keyFields = New System.String() {"USER_ID"}
 
 ' Create writer with field mappings
 Dim mappedWriter = DB.Global.CreateBusinessLogicForWriting(
@@ -39,7 +39,7 @@ Dim mappedWriter = DB.Global.CreateBusinessLogicForWriting(
 )
 
 ' Validator: Ensure required fields are present
-Dim validator1 = DB.Global.CreateValidator(New String() {"userId", "email", "firstName", "lastName"})
+Dim validator1 = DB.Global.CreateValidator(New System.String() {"userId", "email", "firstName", "lastName"})
 
 Return DB.Global.ProcessActionLink(
     DB,
@@ -79,7 +79,7 @@ If PayloadError2 IsNot Nothing Then
     Return PayloadError2
 End If
 
-Dim mappings2 As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim mappings2 As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 ' Required fields (isRequired = True)
 mappings2.Add("orderId", DB.Global.CreateFieldMapping("orderId", "ORDER_ID", True, Nothing))
@@ -94,12 +94,12 @@ mappings2.Add("priority", DB.Global.CreateFieldMapping("priority", "PRIORITY_LEV
 Dim writer2 = DB.Global.CreateBusinessLogicForWriting(
     "ORDERS",
     mappings2,
-    New String() {"ORDER_ID"},
+    New System.String() {"ORDER_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator2 = DB.Global.CreateValidator(New String() {"orderId", "customerId", "orderDate"})
+Dim validator2 = DB.Global.CreateValidator(New System.String() {"orderId", "customerId", "orderDate"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator2, writer2, "Order with validation",
@@ -132,7 +132,7 @@ If PayloadError3 IsNot Nothing Then
     Return PayloadError3
 End If
 
-Dim mappings3 As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim mappings3 As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 mappings3.Add("productId", DB.Global.CreateFieldMapping("productId", "PRODUCT_ID", True, Nothing))
 mappings3.Add("name", DB.Global.CreateFieldMapping("name", "PRODUCT_NAME", True, Nothing))
@@ -147,12 +147,12 @@ mappings3.Add("isVisible", DB.Global.CreateFieldMapping("isVisible", "IS_VISIBLE
 Dim writer3 = DB.Global.CreateBusinessLogicForWriting(
     "PRODUCTS",
     mappings3,
-    New String() {"PRODUCT_ID"},
+    New System.String() {"PRODUCT_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator3 = DB.Global.CreateValidator(New String() {"productId", "name", "price"})
+Dim validator3 = DB.Global.CreateValidator(New System.String() {"productId", "name", "price"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator3, writer3, "Product with defaults",
@@ -187,13 +187,13 @@ If PayloadError4 IsNot Nothing Then
 End If
 
 ' Define mappings for search parameters
-Dim readMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim readMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 readMappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", False, Nothing))
 readMappings.Add("email", DB.Global.CreateFieldMapping("email", "EMAIL_ADDRESS", False, Nothing))
 readMappings.Add("department", DB.Global.CreateFieldMapping("department", "DEPT_CODE", False, Nothing))
 
 ' Create search conditions using SQL column names
-Dim searchConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim searchConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 searchConditions.Add("USER_ID", DB.Global.CreateParameterCondition("userId", "USER_ID = :USER_ID", Nothing))
 searchConditions.Add("EMAIL_ADDRESS", DB.Global.CreateParameterCondition("email", "EMAIL_ADDRESS LIKE :EMAIL_ADDRESS", Nothing))
 searchConditions.Add("DEPT_CODE", DB.Global.CreateParameterCondition("department", "DEPT_CODE = :DEPT_CODE", Nothing))
@@ -234,7 +234,7 @@ If PayloadError5 IsNot Nothing Then
 End If
 
 ' Map from API-friendly names to legacy database columns
-Dim legacyMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim legacyMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 ' Identity fields
 legacyMappings.Add("employeeId", DB.Global.CreateFieldMapping("employeeId", "EMP_NO", True, Nothing))
@@ -261,12 +261,12 @@ legacyMappings.Add("isActive", DB.Global.CreateFieldMapping("isActive", "ACTV_FL
 Dim legacyWriter = DB.Global.CreateBusinessLogicForWriting(
     "EMP_MASTER",
     legacyMappings,
-    New String() {"EMP_NO"},
+    New System.String() {"EMP_NO"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator5 = DB.Global.CreateValidator(New String() {"employeeId", "firstName", "lastName", "hireDate", "departmentCode"})
+Dim validator5 = DB.Global.CreateValidator(New System.String() {"employeeId", "firstName", "lastName", "hireDate", "departmentCode"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator5, legacyWriter, "Employee legacy mapping",
@@ -310,8 +310,8 @@ If PayloadError6 IsNot Nothing Then
 End If
 
 ' Use helper function to create mappings from arrays
-Dim jsonProps = New String() {"customerId", "customerName", "contactEmail", "accountType", "creditLimit"}
-Dim sqlCols = New String() {"CUST_ID", "CUST_NAME", "EMAIL_ADDR", "ACCT_TYPE", "CREDIT_LMT"}
+Dim jsonProps = New System.String() {"customerId", "customerName", "contactEmail", "accountType", "creditLimit"}
+Dim sqlCols = New System.String() {"CUST_ID", "CUST_NAME", "EMAIL_ADDR", "ACCT_TYPE", "CREDIT_LMT"}
 Dim requiredFlags = New Boolean() {True, True, True, False, False}
 Dim isPrimaryKey = New Boolean() {True, False, False, False, False}  ' customerId is primary key
 Dim defaults = New Object() {Nothing, Nothing, Nothing, "STANDARD", 1000}
@@ -328,12 +328,12 @@ Dim dynamicMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim dynamicWriter = DB.Global.CreateBusinessLogicForWriting(
     "CUSTOMERS",
     dynamicMappings,
-    New String() {"CUST_ID"},
+    New System.String() {"CUST_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator6 = DB.Global.CreateValidator(New String() {"customerId", "customerName", "contactEmail"})
+Dim validator6 = DB.Global.CreateValidator(New System.String() {"customerId", "customerName", "contactEmail"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator6, dynamicWriter, "Customer with dynamic mapping",
@@ -356,19 +356,19 @@ If PayloadError7 IsNot Nothing Then
     Return PayloadError7
 End If
 
-Dim validatedMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim validatedMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 validatedMappings.Add("accountId", DB.Global.CreateFieldMapping("accountId", "ACCT_ID", True, Nothing))
 validatedMappings.Add("accountType", DB.Global.CreateFieldMapping("accountType", "ACCT_TYPE", True, Nothing))
 validatedMappings.Add("balance", DB.Global.CreateFieldMapping("balance", "BALANCE_AMT", True, Nothing))
 
 ' Create custom validator for additional checks beyond field mappings
-Dim customValidator = DB.Global.CreateValidator(New String() {"accountId", "accountType"})
+Dim customValidator = DB.Global.CreateValidator(New System.String() {"accountId", "accountType"})
 
 Dim validatedWriter = DB.Global.CreateBusinessLogicForWriting(
     "ACCOUNTS",
     validatedMappings,
-    New String() {"ACCT_ID"},
+    New System.String() {"ACCT_ID"},
     True, Nothing, Nothing, Nothing
 )
 
@@ -398,7 +398,7 @@ If PayloadError8 IsNot Nothing Then
 End If
 
 ' Only these fields are processed
-Dim strictMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim strictMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 strictMappings.Add("transactionId", DB.Global.CreateFieldMapping("transactionId", "TXN_ID", True, Nothing))
 strictMappings.Add("amount", DB.Global.CreateFieldMapping("amount", "TXN_AMT", True, Nothing))
 strictMappings.Add("currency", DB.Global.CreateFieldMapping("currency", "CURRENCY_CODE", False, "USD"))
@@ -407,13 +407,13 @@ strictMappings.Add("timestamp", DB.Global.CreateFieldMapping("timestamp", "TXN_T
 Dim strictWriter = DB.Global.CreateBusinessLogicForWriting(
     "TRANSACTIONS",
     strictMappings,
-    New String() {"TXN_ID"},
+    New System.String() {"TXN_ID"},
     False,  ' No updates - transactions are immutable
     Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator8 = DB.Global.CreateValidator(New String() {"transactionId", "amount", "timestamp"})
+Dim validator8 = DB.Global.CreateValidator(New System.String() {"transactionId", "amount", "timestamp"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator8, strictWriter, "Transaction insert",
@@ -447,9 +447,9 @@ End If
 
 ' Check API version (assume it's in payload or header)
 Dim apiVersionResult = DB.Global.GetStringParameter(ParsedPayload9, "apiVersion")
-Dim apiVersion As String = If(apiVersionResult.Item1, apiVersionResult.Item2, "v1")
+Dim apiVersion As System.String = If(apiVersionResult.Item1, apiVersionResult.Item2, "v1")
 
-Dim versionedMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim versionedMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 If apiVersion = "v1" Then
     ' V1 API: Simple field names
@@ -465,16 +465,16 @@ End If
 Dim versionedWriter = DB.Global.CreateBusinessLogicForWriting(
     "USERS",
     versionedMappings,
-    New String() {"USER_ID"},
+    New System.String() {"USER_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Dynamic validation based on API version
-Dim validator9 As System.Func(Of Newtonsoft.Json.Linq.JObject, String)
+Dim validator9 As System.Func(Of Newtonsoft.Json.Linq.JObject, System.String)
 If apiVersion = "v1" Then
-    validator9 = DB.Global.CreateValidator(New String() {"id", "name"})
+    validator9 = DB.Global.CreateValidator(New System.String() {"id", "name"})
 Else
-    validator9 = DB.Global.CreateValidator(New String() {"userId", "fullName"})
+    validator9 = DB.Global.CreateValidator(New System.String() {"userId", "fullName"})
 End If
 
 Return DB.Global.ProcessActionLink(
@@ -497,7 +497,7 @@ If PayloadError10 IsNot Nothing Then
     Return PayloadError10
 End If
 
-Dim auditMappings As New System.Collections.Generic.Dictionary(Of String, FieldMapping)
+Dim auditMappings As New System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
 
 ' Business fields
 auditMappings.Add("recordId", DB.Global.CreateFieldMapping("recordId", "RECORD_ID", True, Nothing))
@@ -507,19 +507,19 @@ auditMappings.Add("status", DB.Global.CreateFieldMapping("status", "STATUS", Fal
 ' Audit fields with defaults
 ' Note: In production, these would typically be set by database triggers or application logic
 auditMappings.Add("createdBy", DB.Global.CreateFieldMapping("createdBy", "CREATED_BY", False, "SYSTEM"))
-auditMappings.Add("createdDate", DB.Global.CreateFieldMapping("createdDate", "CREATED_DT", False, DateTime.Now))
+auditMappings.Add("createdDate", DB.Global.CreateFieldMapping("createdDate", "CREATED_DT", False, System.DateTime.Now))
 auditMappings.Add("modifiedBy", DB.Global.CreateFieldMapping("modifiedBy", "MODIFIED_BY", False, "SYSTEM"))
-auditMappings.Add("modifiedDate", DB.Global.CreateFieldMapping("modifiedDate", "MODIFIED_DT", False, DateTime.Now))
+auditMappings.Add("modifiedDate", DB.Global.CreateFieldMapping("modifiedDate", "MODIFIED_DT", False, System.DateTime.Now))
 
 Dim auditWriter = DB.Global.CreateBusinessLogicForWriting(
     "AUDITED_RECORDS",
     auditMappings,
-    New String() {"RECORD_ID"},
+    New System.String() {"RECORD_ID"},
     True, Nothing, Nothing, Nothing
 )
 
 ' Validator: Ensure required fields are present
-Dim validator10 = DB.Global.CreateValidator(New String() {"recordId", "description"})
+Dim validator10 = DB.Global.CreateValidator(New System.String() {"recordId", "description"})
 
 Return DB.Global.ProcessActionLink(
     DB, validator10, auditWriter, "Audited record",

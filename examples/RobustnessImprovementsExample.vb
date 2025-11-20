@@ -15,7 +15,7 @@
 ' EXAMPLE 1: SQL PREPEND FOR DATE FORMAT
 ' Use prependSQL to set date format before query execution
 '================================================
-Public Function Example1_DateFormatPrepend() As String
+Public Function Example1_DateFormatPrepend() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, False, "DateExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
@@ -23,8 +23,8 @@ Public Function Example1_DateFormatPrepend() As String
 
     ' Define search parameters
     Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
-        New String() {"startDate", "endDate"},
-        New String() {"OrderDate >= :startDate", "OrderDate <= :endDate"}
+        New System.String() {"startDate", "endDate"},
+        New System.String() {"OrderDate >= :startDate", "OrderDate <= :endDate"}
     )
 
     ' FEATURE: Prepend SQL to set date format
@@ -54,7 +54,7 @@ End Function
 ' EXAMPLE 2: BATCH SIZE LIMITS
 ' Library now enforces maximum batch size (1000 records by default)
 '================================================
-Public Function Example2_BatchWithSizeLimit() As String
+Public Function Example2_BatchWithSizeLimit() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, True, "BatchExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
@@ -62,8 +62,8 @@ Public Function Example2_BatchWithSizeLimit() As String
 
     ' Define field mappings
     Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
-        New String() {"productId", "productName", "price", "stock"},
-        New String() {"ProductId", "ProductName", "Price", "Stock"},
+        New System.String() {"productId", "productName", "price", "stock"},
+        New System.String() {"ProductId", "ProductName", "Price", "Stock"},
         New Boolean() {True, True, True, False},           ' isRequired
         New Boolean() {True, False, False, False},          ' isPrimaryKey
         New Object() {Nothing, Nothing, Nothing, 0}         ' defaultValues
@@ -80,7 +80,7 @@ Public Function Example2_BatchWithSizeLimit() As String
 
     Return DB.Global.ProcessActionLink(
         DB,
-        DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+        DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
         batchLogic,
         "Batch product upsert with size limit",
         ParsedPayload,
@@ -93,12 +93,12 @@ End Function
 ' EXAMPLE 3: VALIDATED FIELD MAPPINGS
 ' Library validates array lengths and detects duplicates
 '================================================
-Public Function Example3_ValidatedFieldMappings() As String
+Public Function Example3_ValidatedFieldMappings() As System.String
     Try
         ' ROBUSTNESS: This will throw exception if arrays have different lengths
         Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"userId", "email", "name"},
-            New String() {"UserId", "Email", "Name"},
+            New System.String() {"userId", "email", "name"},
+            New System.String() {"UserId", "Email", "Name"},
             New Boolean() {True, True, False},              ' isRequired (3 elements)
             New Boolean() {True, False, False},             ' isPrimaryKey (3 elements)
             New Object() {Nothing, Nothing, Nothing}        ' defaultValues (3 elements)
@@ -106,8 +106,8 @@ Public Function Example3_ValidatedFieldMappings() As String
 
         ' ❌ BAD EXAMPLE (would throw exception):
         ' Dim badMappings = DB.Global.CreateFieldMappingsDictionary(
-        '     New String() {"userId", "email", "name"},
-        '     New String() {"UserId", "Email"},             ' ❌ Only 2 elements - EXCEPTION!
+        '     New System.String() {"userId", "email", "name"},
+        '     New System.String() {"UserId", "Email"},             ' ❌ Only 2 elements - EXCEPTION!
         '     New Boolean() {True, True, False},
         '     New Boolean() {True, False, False},
         '     New Object() {Nothing, Nothing, Nothing}
@@ -116,8 +116,8 @@ Public Function Example3_ValidatedFieldMappings() As String
 
         ' ❌ DUPLICATE DETECTION (would throw exception):
         ' Dim duplicateMappings = DB.Global.CreateFieldMappingsDictionary(
-        '     New String() {"userId", "userId", "name"},   ' ❌ Duplicate "userId" - EXCEPTION!
-        '     New String() {"UserId", "UserId", "Name"},
+        '     New System.String() {"userId", "userId", "name"},   ' ❌ Duplicate "userId" - EXCEPTION!
+        '     New System.String() {"UserId", "UserId", "Name"},
         '     New Boolean() {True, True, False},
         '     New Boolean() {True, False, False},
         '     New Object() {Nothing, Nothing, Nothing}
@@ -136,7 +136,7 @@ Public Function Example3_ValidatedFieldMappings() As String
 
         Return DB.Global.ProcessActionLink(
             DB,
-            DB.Global.CreateValidator(New String() {"userId", "email"}),
+            DB.Global.CreateValidator(New System.String() {"userId", "email"}),
             writeLogic,
             "User write with validated mappings",
             ParsedPayload,
@@ -153,7 +153,7 @@ End Function
 ' EXAMPLE 4: COMPOSITE KEY WITH SAFE DELIMITER
 ' Library now uses ASCII 31 (Unit Separator) to prevent key collisions
 '================================================
-Public Function Example4_CompositeKeysNoCollision() As String
+Public Function Example4_CompositeKeysNoCollision() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, True, "CompositeKeyExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
@@ -161,8 +161,8 @@ Public Function Example4_CompositeKeysNoCollision() As String
 
     ' Composite key scenario: OrderId + LineNumber
     Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
-        New String() {"orderId", "lineNumber", "productId", "quantity"},
-        New String() {"OrderId", "LineNumber", "ProductId", "Quantity"},
+        New System.String() {"orderId", "lineNumber", "productId", "quantity"},
+        New System.String() {"OrderId", "LineNumber", "ProductId", "Quantity"},
         New Boolean() {True, True, True, True},                     ' isRequired
         New Boolean() {True, True, False, False},                   ' isPrimaryKey (both orderId and lineNumber)
         New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -182,7 +182,7 @@ Public Function Example4_CompositeKeysNoCollision() As String
 
     Return DB.Global.ProcessActionLink(
         DB,
-        DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+        DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
         batchLogic,
         "Order lines batch with safe composite keys",
         ParsedPayload,
@@ -195,7 +195,7 @@ End Function
 ' EXAMPLE 5: INTEGER OVERFLOW PROTECTION
 ' Library validates integer ranges to prevent overflow exceptions
 '================================================
-Public Function Example5_OverflowProtection() As String
+Public Function Example5_OverflowProtection() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, False, "OverflowExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
@@ -213,7 +213,7 @@ Public Function Example5_OverflowProtection() As String
         Return DB.Global.CreateErrorResponse("Invalid age parameter (must be integer in valid range)")
     End If
 
-    Dim age As Integer = ageResult.Item2
+    Dim age As System.Int32 = ageResult.Item2
 
     ' Use age safely - no overflow exceptions possible
     Return Newtonsoft.Json.JsonConvert.SerializeObject(New With {
@@ -227,15 +227,15 @@ End Function
 ' EXAMPLE 6: CASE-INSENSITIVE {WHERE} PLACEHOLDER
 ' Library now handles {WHERE}, {where}, {Where}, etc.
 '================================================
-Public Function Example6_CaseInsensitivePlaceholder() As String
+Public Function Example6_CaseInsensitivePlaceholder() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, False, "CaseExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
     End If
 
     Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
-        New String() {"status"},
-        New String() {"Status = :status"}
+        New System.String() {"status"},
+        New System.String() {"Status = :status"}
     )
 
     ' ROBUSTNESS: All these work now (case-insensitive)
@@ -268,7 +268,7 @@ End Function
 ' EXAMPLE 7: SQL IDENTIFIER VALIDATION
 ' Library validates table and column names to prevent SQL injection
 '================================================
-Public Function Example7_SQLInjectionPrevention() As String
+Public Function Example7_SQLInjectionPrevention() As System.String
     Try
         ' ✅ VALID IDENTIFIERS:
         ' - "Users"
@@ -290,8 +290,8 @@ Public Function Example7_SQLInjectionPrevention() As String
         ' SECURITY: Table and column names are validated automatically
         ' This would throw exception if tableName contains SQL injection attempts
         Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
-            New String() {"userId", "userName"},
-            New String() {"UserId", "UserName"},    ' ✅ Valid column names
+            New System.String() {"userId", "userName"},
+            New System.String() {"UserId", "UserName"},    ' ✅ Valid column names
             New Boolean() {True, True},
             New Boolean() {True, False},
             New Object() {Nothing, Nothing}
@@ -312,7 +312,7 @@ Public Function Example7_SQLInjectionPrevention() As String
 
         Return DB.Global.ProcessActionLink(
             DB,
-            DB.Global.CreateValidator(New String() {"userId", "userName"}),
+            DB.Global.CreateValidator(New System.String() {"userId", "userName"}),
             writeLogic,
             "Write with SQL injection protection",
             ParsedPayload,
@@ -329,15 +329,15 @@ End Function
 ' EXAMPLE 8: KEY FIELD VALIDATION
 ' Library ensures all key fields are present before executing queries
 '================================================
-Public Function Example8_KeyFieldValidation() As String
+Public Function Example8_KeyFieldValidation() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, True, "KeyValidationExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
     End If
 
     Dim fieldMappings = DB.Global.CreateFieldMappingsDictionary(
-        New String() {"orderId", "customerId", "orderDate", "amount"},
-        New String() {"OrderId", "CustomerId", "OrderDate", "Amount"},
+        New System.String() {"orderId", "customerId", "orderDate", "amount"},
+        New System.String() {"OrderId", "CustomerId", "OrderDate", "Amount"},
         New Boolean() {True, True, True, True},             ' All required
         New Boolean() {True, False, False, False},          ' Only OrderId is primary key
         New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -357,7 +357,7 @@ Public Function Example8_KeyFieldValidation() As String
 
     Return DB.Global.ProcessActionLink(
         DB,
-        DB.Global.CreateValidator(New String() {"orderId", "customerId", "orderDate", "amount"}),
+        DB.Global.CreateValidator(New System.String() {"orderId", "customerId", "orderDate", "amount"}),
         writeLogic,
         "Order write with key field validation",
         ParsedPayload,
@@ -370,15 +370,15 @@ End Function
 ' EXAMPLE 9: DBNULL CONVERSION
 ' Library converts DBNull to Nothing for proper JSON serialization
 '================================================
-Public Function Example9_DBNullHandling() As String
+Public Function Example9_DBNullHandling() As System.String
     Dim validationResult = DB.Global.ValidatePayloadAndToken(DB, False, "DBNullExample", ParsedPayload, StringPayload)
     If validationResult IsNot Nothing Then
         Return validationResult
     End If
 
     Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
-        New String() {"userId"},
-        New String() {"UserId = :userId"}
+        New System.String() {"userId"},
+        New System.String() {"UserId = :userId"}
     )
 
     ' ROBUSTNESS: NULL values in database are now converted to null in JSON
@@ -422,7 +422,7 @@ End Function
 ' EXAMPLE 10: RESOURCE CLEANUP IMPROVEMENTS
 ' Library now uses try-finally for all database operations
 '================================================
-Public Function Example10_ResourceCleanup() As String
+Public Function Example10_ResourceCleanup() As System.String
     ' ROBUSTNESS: All database operations now include proper cleanup
     '
     ' Old code (potential leak):
@@ -454,8 +454,8 @@ Public Function Example10_ResourceCleanup() As String
 
     ' Even if this query throws exception, resources are cleaned up properly
     Dim searchConditions = DB.Global.CreateParameterConditionsDictionary(
-        New String() {"invalidField"},
-        New String() {"NonExistentColumn = :invalidField"}  ' This will cause error
+        New System.String() {"invalidField"},
+        New System.String() {"NonExistentColumn = :invalidField"}  ' This will cause error
     )
 
     Try

@@ -23,8 +23,8 @@ End If
 ' - isPrimaryKeyArray: Which fields are primary keys (for existence checking)
 ' - defaultValArray: Default values for fields
 Dim fieldMappingsWithPK = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"userId", "email", "name", "department"},
-    New String() {"UserId", "Email", "Name", "Department"},
+    New System.String() {"userId", "email", "name", "department"},
+    New System.String() {"UserId", "Email", "Name", "Department"},
     New Boolean() {True, True, False, False},     ' userId and email are required
     New Boolean() {True, False, False, False},    ' Only userId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -41,7 +41,7 @@ Dim upsertLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"userId", "email"}),
+    DB.Global.CreateValidator(New System.String() {"userId", "email"}),
     upsertLogic,
     "User upserted using primary key from field mappings",
     ParsedPayload,
@@ -74,8 +74,8 @@ End If
 
 ' Composite key: both orderId and productId are primary keys
 Dim compositePKMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"orderId", "productId", "quantity", "price"},
-    New String() {"OrderId", "ProductId", "Quantity", "Price"},
+    New System.String() {"orderId", "productId", "quantity", "price"},
+    New System.String() {"OrderId", "ProductId", "Quantity", "Price"},
     New Boolean() {True, True, True, False},      ' orderId, productId, quantity are required
     New Boolean() {True, True, False, False},     ' orderId AND productId are primary keys
     New Object() {Nothing, Nothing, Nothing, 0}
@@ -89,7 +89,7 @@ Dim compositeKeyLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"orderId", "productId", "quantity"}),
+    DB.Global.CreateValidator(New System.String() {"orderId", "productId", "quantity"}),
     compositeKeyLogic,
     "Order item saved using composite key",
     ParsedPayload2,
@@ -115,8 +115,8 @@ If PayloadError3 IsNot Nothing Then
 End If
 
 Dim insertOnlyMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"userId", "email", "name"},
-    New String() {"UserId", "Email", "Name"},
+    New System.String() {"userId", "email", "name"},
+    New System.String() {"UserId", "Email", "Name"},
     New Boolean() {True, True, True},      ' All fields required
     New Boolean() {True, False, False},    ' userId is primary key
     New Object() {Nothing, Nothing, Nothing}
@@ -132,7 +132,7 @@ Dim insertOnlyLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"userId", "email", "name"}),
+    DB.Global.CreateValidator(New System.String() {"userId", "email", "name"}),
     insertOnlyLogic,
     "User inserted (updates not allowed)",
     ParsedPayload3,
@@ -157,8 +157,8 @@ If PayloadError4 IsNot Nothing Then
 End If
 
 Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"userId", "email", "name", "department"},
-    New String() {"UserId", "Email", "Name", "Department"},
+    New System.String() {"userId", "email", "name", "department"},
+    New System.String() {"UserId", "Email", "Name", "Department"},
     New Boolean() {True, True, True, False},
     New Boolean() {True, False, False, False},    ' userId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -173,7 +173,7 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     batchLogic,
     "Batch operation completed with primary key declaration",
     ParsedPayload4,
@@ -214,8 +214,8 @@ End If
 
 ' Old style: no IsPrimaryKey in field mappings
 Dim oldStyleMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"userId", "email", "name"},
-    New String() {"UserId", "Email", "Name"},
+    New System.String() {"userId", "email", "name"},
+    New System.String() {"UserId", "Email", "Name"},
     New Boolean() {True, True, False},
     Nothing,  ' No IsPrimaryKey array - will use explicit keyFields parameter below
     New Object() {Nothing, Nothing, Nothing}
@@ -225,13 +225,13 @@ Dim oldStyleMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim oldStyleLogic = DB.Global.CreateBusinessLogicForWriting(
     "Users",
     oldStyleMappings,
-    New String() {"UserId"},    ' Explicitly specify key fields (old way)
+    New System.String() {"UserId"},    ' Explicitly specify key fields (old way)
     True                        ' allowUpdates
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"userId", "email"}),
+    DB.Global.CreateValidator(New System.String() {"userId", "email"}),
     oldStyleLogic,
     "User upserted (backward compatible approach)",
     ParsedPayload5,
@@ -259,8 +259,8 @@ End If
 ' - email: Required but NOT primary key
 ' - name: Neither required nor primary key
 Dim clarifyingMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"userId", "email", "name", "phone"},
-    New String() {"UserId", "Email", "Name", "Phone"},
+    New System.String() {"userId", "email", "name", "phone"},
+    New System.String() {"UserId", "Email", "Name", "Phone"},
     New Boolean() {True, True, False, False},     ' userId and email are required
     New Boolean() {True, False, False, False},    ' Only userId is primary key
     New Object() {Nothing, Nothing, Nothing, Nothing}
@@ -273,7 +273,7 @@ Dim clarifyingLogic = DB.Global.CreateBusinessLogicForWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"userId", "email"}),
+    DB.Global.CreateValidator(New System.String() {"userId", "email"}),
     clarifyingLogic,
     "User saved",
     ParsedPayload6,

@@ -40,8 +40,8 @@ End If
 
 ' Performance tip: Primary key declaration enables optimized bulk existence check
 Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"productId", "productName", "sku", "category", "price", "stock", "description", "isActive"},
-    New String() {"ProductId", "ProductName", "SKU", "Category", "Price", "Stock", "Description", "IsActive"},
+    New System.String() {"productId", "productName", "sku", "category", "price", "stock", "description", "isActive"},
+    New System.String() {"ProductId", "ProductName", "SKU", "Category", "Price", "Stock", "Description", "IsActive"},
     New Boolean() {True, True, False, False, False, False, False, False},     ' productId, productName required
     New Boolean() {True, False, False, False, False, False, False, False},    ' productId is primary key
     New Object() {Nothing, Nothing, Nothing, "General", 0, 0, Nothing, 1}     ' Defaults
@@ -58,7 +58,7 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     True      ' Allow updates (upsert mode)
 )
 
-Dim batchValidator = DB.Global.CreateValidatorForBatch(New String() {"Records"})
+Dim batchValidator = DB.Global.CreateValidatorForBatch(New System.String() {"Records"})
 
 Return DB.Global.ProcessActionLink(
     DB, batchValidator, batchLogic,
@@ -112,8 +112,8 @@ If PayloadError2 IsNot Nothing Then
 End If
 
 Dim insertOnlyMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"productId", "productName", "sku", "category", "price", "stock"},
-    New String() {"ProductId", "ProductName", "SKU", "Category", "Price", "Stock"},
+    New System.String() {"productId", "productName", "sku", "category", "price", "stock"},
+    New System.String() {"ProductId", "ProductName", "SKU", "Category", "Price", "Stock"},
     New Boolean() {True, True, True, False, False, False},
     New Boolean() {True, False, False, False, False, False},
     New Object() {Nothing, Nothing, Nothing, "General", 0, 0}
@@ -130,7 +130,7 @@ Dim insertOnlyLogic = DB.Global.CreateBusinessLogicForBatchWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     insertOnlyLogic,
     "Batch insert completed",
     ParsedPayload2, StringPayload2, False
@@ -168,8 +168,8 @@ End If
 
 ' Strict validation: all fields required
 Dim strictMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"productId", "productName", "sku", "price", "stock"},
-    New String() {"ProductId", "ProductName", "SKU", "Price", "Stock"},
+    New System.String() {"productId", "productName", "sku", "price", "stock"},
+    New System.String() {"ProductId", "ProductName", "SKU", "Price", "Stock"},
     New Boolean() {True, True, True, True, True},  ' All required
     New Boolean() {True, False, False, False, False},
     New Object() {Nothing, Nothing, Nothing, Nothing, Nothing}  ' No defaults
@@ -184,7 +184,7 @@ Dim strictBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     strictBatchLogic,
     "Batch operation with validation completed",
     ParsedPayload3, StringPayload3, False
@@ -236,7 +236,7 @@ If PayloadError4 IsNot Nothing Then
     Return PayloadError4
 End If
 
-Dim searchConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim searchConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 searchConditions.Add("Category", DB.Global.CreateParameterCondition(
     "Category", "Category = :Category", Nothing))
@@ -301,31 +301,31 @@ If PayloadError5 IsNot Nothing Then
 End If
 
 ' Measure query performance
-Dim startTime As DateTime
-Dim endTime As DateTime
+Dim startTime As System.DateTime
+Dim endTime As System.DateTime
 
 ' Test query: retrieve 100 products
 Dim testSQL = "SELECT TOP 100 ProductId, ProductName, Category, Price, Stock FROM Products WHERE IsActive = 1"
-Dim testConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim testConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 ' Test 1: Standard Mode
-startTime = DateTime.Now
+startTime = System.DateTime.Now
 Dim standardLogic = DB.Global.CreateBusinessLogicForReading(
     testSQL, testConditions, Nothing, Nothing, False)
 Dim standardResult = standardLogic(DB, ParsedPayload5)
-endTime = DateTime.Now
+endTime = System.DateTime.Now
 Dim standardTime = (endTime - startTime).TotalMilliseconds
 
 ' Test 2: FOR JSON PATH Mode
-startTime = DateTime.Now
+startTime = System.DateTime.Now
 Dim jsonPathLogic = DB.Global.CreateBusinessLogicForReading(
     testSQL, testConditions, Nothing, Nothing, True)
 Dim jsonPathResult = jsonPathLogic(DB, ParsedPayload5)
-endTime = DateTime.Now
+endTime = System.DateTime.Now
 Dim jsonPathTime = (endTime - startTime).TotalMilliseconds
 
 ' Calculate improvement
-Dim improvement As Double = 0
+Dim improvement As System.Double = 0
 If standardTime > 0 Then
     improvement = ((standardTime - jsonPathTime) / standardTime) * 100
 End If
@@ -333,10 +333,10 @@ End If
 Return Newtonsoft.Json.JsonConvert.SerializeObject(New With {
     .Result = "OK",
     .PerformanceComparison = New With {
-        .StandardMode_ms = Math.Round(standardTime, 2),
-        .ForJsonPathMode_ms = Math.Round(jsonPathTime, 2),
-        .ImprovementPercent = Math.Round(improvement, 2),
-        .ImprovementDescription = $"FOR JSON PATH was {Math.Round(improvement, 1)}% faster"
+        .StandardMode_ms = System.Math.Round(standardTime, 2),
+        .ForJsonPathMode_ms = System.Math.Round(jsonPathTime, 2),
+        .ImprovementPercent = System.Math.Round(improvement, 2),
+        .ImprovementDescription = $"FOR JSON PATH was {System.Math.Round(improvement, 1)}% faster"
     },
     .Recommendation = If(improvement > 20,
         "FOR JSON PATH provides significant performance improvement - recommended for this query",
@@ -361,8 +361,8 @@ End If
 
 ' Table: OrderItems with composite key (OrderId + ProductId)
 Dim compositeKeyMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"orderId", "productId", "quantity", "unitPrice", "discount"},
-    New String() {"OrderId", "ProductId", "Quantity", "UnitPrice", "Discount"},
+    New System.String() {"orderId", "productId", "quantity", "unitPrice", "discount"},
+    New System.String() {"OrderId", "ProductId", "Quantity", "UnitPrice", "Discount"},
     New Boolean() {True, True, True, False, False},                    ' orderId, productId, quantity required
     New Boolean() {True, True, False, False, False},                   ' orderId AND productId are primary keys
     New Object() {Nothing, Nothing, Nothing, 0, 0}
@@ -380,7 +380,7 @@ Dim compositeKeyBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     compositeKeyBatchLogic,
     "Composite key batch completed",
     ParsedPayload6, StringPayload6, False
@@ -443,8 +443,8 @@ If PayloadError8 IsNot Nothing Then
 End If
 
 Dim recoveryMappings = DB.Global.CreateFieldMappingsDictionary(
-    New String() {"productId", "productName", "price"},
-    New String() {"ProductId", "ProductName", "Price"},
+    New System.String() {"productId", "productName", "price"},
+    New System.String() {"ProductId", "ProductName", "Price"},
     New Boolean() {True, True, True},
     New Boolean() {True, False, False},
     New Object() {Nothing, Nothing, Nothing}
@@ -459,7 +459,7 @@ Dim recoveryBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
 
 Dim result = DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidatorForBatch(New String() {"Records"}),
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     recoveryBatchLogic,
     "Batch operation completed",
     ParsedPayload8, StringPayload8, False
@@ -467,12 +467,12 @@ Dim result = DB.Global.ProcessActionLink(
 
 ' Parse result to check for errors
 Dim resultObj = Newtonsoft.Json.Linq.JObject.Parse(result)
-Dim errorCount As Integer = If(resultObj("Errors") IsNot Nothing, resultObj("Errors").ToObject(Of Integer)(), 0)
+Dim errorCount As System.Int32 = If(resultObj("Errors") IsNot Nothing, resultObj("Errors").ToObject(Of Integer)(), 0)
 
 If errorCount > 0 Then
     ' Log failed records for retry
     Dim errorDetails = resultObj("ErrorDetails")
-    DB.Global.LogCustom(DB, StringPayload8, errorDetails.ToString(),
+    DB.Global.LogCustom(DB, StringPayload8, errorDetails.ToSystem.String(),
         $"Batch operation had {errorCount} errors - review and retry failed records")
 
     ' You could:

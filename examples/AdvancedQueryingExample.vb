@@ -60,7 +60,7 @@ If PayloadError1 IsNot Nothing Then
 End If
 
 ' Define comprehensive search conditions
-Dim complexConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim complexConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 ' Exact match filters
 complexConditions.Add("SaleId", DB.Global.CreateParameterCondition(
@@ -211,7 +211,7 @@ If PayloadError2 IsNot Nothing Then
     Return PayloadError2
 End If
 
-Dim analyticsConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim analyticsConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 analyticsConditions.Add("Region", DB.Global.CreateParameterCondition(
     "Region",
@@ -300,7 +300,7 @@ If PayloadError3 IsNot Nothing Then
     Return PayloadError3
 End If
 
-Dim joinConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim joinConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 joinConditions.Add("CustomerName", DB.Global.CreateParameterCondition(
     "CustomerName",
@@ -379,7 +379,7 @@ If PayloadError4 IsNot Nothing Then
     Return PayloadError4
 End If
 
-Dim subqueryConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim subqueryConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 subqueryConditions.Add("MinTotalSpent", DB.Global.CreateParameterCondition(
     "MinTotalSpent",
@@ -461,7 +461,7 @@ If PayloadError5 IsNot Nothing Then
     Return PayloadError5
 End If
 
-Dim rankingConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim rankingConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 rankingConditions.Add("StartDate", DB.Global.CreateParameterCondition(
     "StartDate",
@@ -524,7 +524,7 @@ If PayloadError6 IsNot Nothing Then
     Return PayloadError6
 End If
 
-Dim trendsConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim trendsConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 trendsConditions.Add("Granularity", DB.Global.CreateParameterCondition(
     "Granularity",
@@ -546,10 +546,10 @@ trendsConditions.Add("EndDate", DB.Global.CreateParameterCondition(
 
 ' Get granularity parameter (daily, weekly, monthly)
 Dim granularityResult = DB.Global.GetStringParameter(ParsedPayload6, "Granularity")
-Dim granularity As String = If(granularityResult.Item1, granularityResult.Item2.ToUpper(), "DAILY")
+Dim granularity As System.String = If(granularityResult.Item1, granularityResult.Item2.ToUpper(), "DAILY")
 
 ' Dynamic GROUP BY based on granularity
-Dim dateGrouping As String
+Dim dateGrouping As System.String
 Select Case granularity
     Case "DAILY"
         dateGrouping = "CAST(SaleDate AS DATE)"
@@ -609,7 +609,7 @@ If PayloadError7 IsNot Nothing Then
     Return PayloadError7
 End If
 
-Dim cohortConditions As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim cohortConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 cohortConditions.Add("CohortStartDate", DB.Global.CreateParameterCondition(
     "CohortStartDate",
@@ -665,7 +665,7 @@ If PayloadError8 IsNot Nothing Then
     Return PayloadError8
 End If
 
-Dim searchConditions8 As New System.Collections.Generic.Dictionary(Of String, Object)
+Dim searchConditions8 As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
 ' Multiple LIKE conditions for comprehensive search
 searchConditions8.Add("SearchTerm", DB.Global.CreateParameterCondition(
