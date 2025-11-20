@@ -406,18 +406,14 @@ Public Class BusinessLogicReaderWrapper
                 End If
             End If
 
-            ' FEATURE: Prepend SQL if specified (e.g., SET DATEFORMAT ymd;)
-            If Not System.String.IsNullOrEmpty(_prependSQL) Then
-                finalSQL = _prependSQL & " " & finalSQL
-            End If
-
             ' Execute query - use FOR JSON PATH if enabled for better performance
             If _useForJsonPath Then
                 ' PERFORMANCE MODE: Use SQL Server's native FOR JSON PATH
                 ' This is 40-60% faster as SQL Server does JSON serialization in native C++ code
                 ' ROBUST: Automatically fallback to standard mode if JSON is malformed
                 Try
-                    Dim jsonRecords As System.String = ExecuteQueryToJSON(database, finalSQL, sqlParameters)
+                    ' Pass prependSQL to ExecuteQueryToJSON so it places it before outer SELECT CAST
+                    Dim jsonRecords As System.String = ExecuteQueryToJSON(database, finalSQL, sqlParameters, _prependSQL)
 
                     ' Parse the JSON string back to array for consistent response format
                     ' This validates that SQL Server generated valid JSON
@@ -428,7 +424,9 @@ Public Class BusinessLogicReaderWrapper
                     response.Add("Result", "OK")
                     response.Add("ProvidedParameters", System.String.Join(",", providedParams))
                     If _includeExecutedSQL Then
-                        response.Add("ExecutedSQL", finalSQL & " FOR JSON PATH")
+                        ' Include prepend in ExecutedSQL output if specified
+                        Dim executedSQL As System.String = If(Not System.String.IsNullOrEmpty(_prependSQL), _prependSQL & " ", "") & finalSQL & " FOR JSON PATH"
+                        response.Add("ExecutedSQL", executedSQL)
                     End If
                     response.Add("Records", recordsArray)
 
@@ -436,14 +434,20 @@ Public Class BusinessLogicReaderWrapper
                 Catch jsonEx As Newtonsoft.Json.JsonException
                     ' FOR JSON PATH failed due to malformed JSON (unescaped chars, etc.)
                     ' AUTOMATIC FALLBACK: Retry with standard Dictionary mode
-                    Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
+                    ' Prepend SQL for standard dictionary mode
+                    Dim sqlWithPrepend As System.String = finalSQL
+                    If Not System.String.IsNullOrEmpty(_prependSQL) Then
+                        sqlWithPrepend = _prependSQL & " " & finalSQL
+                    End If
+
+                    Dim rows = ExecuteQueryToDictionary(database, sqlWithPrepend, sqlParameters)
 
                     ' Build response conditionally including ExecutedSQL
                     Dim response As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
                     response.Add("Result", "OK")
                     response.Add("ProvidedParameters", System.String.Join(",", providedParams))
                     If _includeExecutedSQL Then
-                        response.Add("ExecutedSQL", finalSQL)
+                        response.Add("ExecutedSQL", sqlWithPrepend)
                     End If
                     response.Add("Records", rows)
                     response.Add("PerformanceMode", "Standard (FOR JSON PATH failed - data contains special characters)")
@@ -453,14 +457,20 @@ Public Class BusinessLogicReaderWrapper
                 End Try
             Else
                 ' STANDARD MODE: Dictionary conversion in VB code (more flexible for complex transformations)
-                Dim rows = ExecuteQueryToDictionary(database, finalSQL, sqlParameters)
+                ' Prepend SQL if specified
+                Dim sqlWithPrepend As System.String = finalSQL
+                If Not System.String.IsNullOrEmpty(_prependSQL) Then
+                    sqlWithPrepend = _prependSQL & " " & finalSQL
+                End If
+
+                Dim rows = ExecuteQueryToDictionary(database, sqlWithPrepend, sqlParameters)
 
                 ' Build response conditionally including ExecutedSQL
                 Dim response As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
                 response.Add("Result", "OK")
                 response.Add("ProvidedParameters", System.String.Join(",", providedParams))
                 If _includeExecutedSQL Then
-                    response.Add("ExecutedSQL", finalSQL)
+                    response.Add("ExecutedSQL", sqlWithPrepend)
                 End If
                 response.Add("Records", rows)
 
@@ -1496,8 +1506,9 @@ End Function
 ''' <param name="database">Database connection object</param>
 ''' <param name="sql">SQL query (FOR JSON PATH will be appended automatically)</param>
 ''' <param name="parameters">Query parameters dictionary</param>
+''' <param name="prependSQL">Optional SQL to prepend before outer SELECT CAST (e.g., "SET DATEFORMAT ymd;")</param>
 ''' <returns>JSON string with array of records, or empty array [] if no results</returns>
-Public Shared Function ExecuteQueryToJSON(database As System.Object, sql As System.String, parameters As System.Collections.Generic.Dictionary(Of System.String, System.Object)) As System.String
+Public Shared Function ExecuteQueryToJSON(database As System.Object, sql As System.String, parameters As System.Collections.Generic.Dictionary(Of System.String, System.Object), Optional prependSQL As System.String = Nothing) As System.String
     Dim q As New QWTable()
     Try
         q.Database = database
@@ -1509,6 +1520,13 @@ Public Shared Function ExecuteQueryToJSON(database As System.Object, sql As Syst
         ' This prevents truncation issues that can cause malformed JSON
 
         Dim jsonSQL As System.String = $"SELECT CAST(( {sql} FOR JSON PATH, INCLUDE_NULL_VALUES ) AS NVARCHAR(MAX)) AS JsonResult"
+
+        ' FEATURE: Prepend SQL if specified (e.g., SET DATEFORMAT ymd;)
+        ' Place it BEFORE the outer SELECT CAST to ensure valid SQL syntax
+        If Not System.String.IsNullOrEmpty(prependSQL) Then
+            jsonSQL = prependSQL & " " & jsonSQL
+        End If
+
         q.SQL = jsonSQL
 
         If parameters IsNot Nothing Then
