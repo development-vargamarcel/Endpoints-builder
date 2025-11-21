@@ -156,136 +156,122 @@ Dim validator = DB.Global.CreateValidator(New String() {"UserId", "Email"})
 
 ---
 
-### CreateValidatorForBatch
-
-Creates a validator for batch operations requiring array parameters.
-
-```vb
-Function CreateValidatorForBatch(
-    requiredArrayParams As String()
-) As Func(Of JObject, String)
-```
-
-**Parameters:**
-- `requiredArrayParams`: Array of required array parameter names
-
-**Returns:** Validation function
-
-**Example:**
-```vb
-Dim batchValidator = DB.Global.CreateValidatorForBatch(New String() {"Records"})
-```
-
----
-
 ## Factory Functions
 
 ### CreateBusinessLogicForReading
 
-Creates standard read logic for a table.
+Creates read logic with custom SQL and parameter conditions. Automatically uses FOR JSON PATH for optimal performance (40-60% faster) with automatic fallback to standard mode if needed.
 
 ```vb
 Function CreateBusinessLogicForReading(
-    tableName As String,
-    AllParametersList As String(),
-    excludeFields As String(),
-    Optional useLikeOperator As Boolean = True
+    baseSQL As String,
+    parameterConditions As Dictionary(Of String, Object),
+    Optional defaultWhereClause As String = Nothing,
+    Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing,
+    Optional prependSQL As String = Nothing
 ) As Func(Of Object, JObject, Object)
 ```
 
 **Parameters:**
-- `tableName`: Name of the table to query
-- `AllParametersList`: Array of field names that can be used for filtering
-- `excludeFields`: Array of field names to exclude from response
-- `useLikeOperator`: Use LIKE (True) or equals (False) for comparisons
+- `baseSQL`: Base SQL query. Use `{WHERE}` placeholder for dynamic WHERE clause
+- `parameterConditions`: Dictionary of parameter conditions (use `CreateParameterConditionsDictionary` helper)
+- `defaultWhereClause`: WHERE clause applied when no parameters provided
+- `fieldMappings`: Optional field mappings (JSON to SQL column names)
+- `prependSQL`: Optional SQL to prepend before the query (e.g., "SET DATEFORMAT ymd;" for session configuration)
 
 **Returns:** Business logic function
 
-**Example:**
+**Performance Note:**
+The library automatically attempts FOR JSON PATH mode first for 40-60% better performance. If JSON parsing fails (malformed data, unescaped characters), it automatically falls back to standard dictionary mode. This gives you optimal performance without any configuration.
+
+**Example (Basic Usage):**
 ```vb
-Dim readLogic = DB.Global.CreateBusinessLogicForReading(
-    "Users",
-    New String() {"UserId", "Email", "Name"},
-    New String() {"Password", "PasswordHash"},
-    True
+Dim conditions = DB.Global.CreateParameterConditionsDictionary(
+    New String() {"startDate", "endDate"},
+    New String() {"OrderDate >= :startDate", "OrderDate <= :endDate"}
+)
+
+Dim logic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT OrderId, CustomerId, OrderDate, TotalAmount FROM Orders {WHERE} ORDER BY OrderDate DESC",
+    conditions,
+    "OrderDate >= DATEADD(day, -30, GETDATE())",
+    Nothing,
+    Nothing
 )
 ```
 
-**Generated SQL:**
-```sql
--- With useLikeOperator = True
-SELECT * FROM Users WHERE UserId LIKE :UserId AND Email LIKE :Email
-
--- With useLikeOperator = False
-SELECT * FROM Users WHERE UserId = :UserId AND Email = :Email
-```
-
----
-
-### CreateBusinessLogicForWriting
-
-Creates standard write logic (insert/update) for a table.
-
+**Example (With Session Configuration via prependSQL):**
 ```vb
-Function CreateBusinessLogicForWriting(
-    tableName As String,
-    AllParametersList As String(),
-    RequiredParametersList As String(),
-    allowUpdates As Boolean
-) As Func(Of Object, JObject, Object)
-```
-
-**Parameters:**
-- `tableName`: Name of the table
-- `AllParametersList`: Array of all field names that can be written
-- `RequiredParametersList`: Array of required fields (used as primary key)
-- `allowUpdates`: Allow updates to existing records (True) or insert only (False)
-
-**Returns:** Business logic function
-
-**Example:**
-```vb
-Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
-    "Users",
-    New String() {"UserId", "Email", "Name", "Department"},
-    New String() {"UserId"},
-    True
+' Use prependSQL for session-level SQL configuration
+Dim logic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT OrderId, CustomerId, OrderDate FROM Orders {WHERE}",
+    conditions,
+    Nothing,
+    Nothing,
+    "SET DATEFORMAT ymd;"  ' Prepend session config before query
 )
 ```
 
-**Behavior:**
-- Checks if record exists based on `RequiredParametersList`
-- If exists and `allowUpdates = True`: Updates non-key fields
-- If exists and `allowUpdates = False`: Returns error
-- If not exists: Inserts new record
+**Example (With Field Mappings):**
+```vb
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"orderId", "customerId"},
+    New String() {"ORDER_ID", "CUSTOMER_ID"}
+)
+
+Dim logic = DB.Global.CreateBusinessLogicForReading(
+    "SELECT ORDER_ID, CUSTOMER_ID FROM ORDERS {WHERE}",
+    conditions,
+    Nothing,
+    mappings,
+    Nothing
+)
+```
+
+**SQL Generation:**
+- `{WHERE}` replaced with `WHERE` + generated conditions
+- Conditions combined with `AND`
+- Default clause used when no parameters provided
+- Case-insensitive placeholder matching (`{where}`, `{WHERE}`, `{Where}` all work)
 
 ---
 
-### CreateBusinessLogicForWritingBatch
+### CreateBusinessLogicForBatchWriting
 
-Creates batch write logic for multiple records.
+Creates batch write logic for multiple records with automatic bulk existence checking for optimal performance.
 
 ```vb
-Function CreateBusinessLogicForWritingBatch(
+Function CreateBusinessLogicForBatchWriting(
     tableName As String,
-    AllParametersList As String(),
-    RequiredParametersList As String(),
-    allowUpdates As Boolean
+    fieldMappings As Dictionary(Of String, FieldMapping),
+    Optional allowUpdates As Boolean = True
 ) As Func(Of Object, JObject, Object)
 ```
 
 **Parameters:**
-- Same as `CreateBusinessLogicForWriting`
+- `tableName`: Table name
+- `fieldMappings`: Dictionary mapping JSON properties to SQL columns (must include fields with `IsPrimaryKey = True`)
+- `allowUpdates`: Allow updates to existing records (default: True)
 
 **Returns:** Business logic function
 
+**Performance Note:**
+Uses bulk existence checking to reduce N database queries to 1 query, resulting in 50-90% faster batch operations.
+
 **Example:**
 ```vb
-Dim batchLogic = DB.Global.CreateBusinessLogicForWritingBatch(
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"productId", "name", "price", "stock"},
+    New String() {"ProductId", "ProductName", "Price", "StockLevel"},
+    New Boolean() {True, True, False, False},        ' isRequired
+    New Boolean() {True, False, False, False},       ' isPrimaryKey
+    Nothing
+)
+
+Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
-    New String() {"ProductId", "Name", "Price"},
-    New String() {"ProductId"},
-    True
+    mappings,
+    True  ' Allow updates
 )
 ```
 
@@ -293,8 +279,8 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForWritingBatch(
 ```json
 {
   "Records": [
-    {"ProductId": "P001", "Name": "Product 1", "Price": 19.99},
-    {"ProductId": "P002", "Name": "Product 2", "Price": 29.99}
+    {"productId": "P001", "name": "Product 1", "price": 19.99, "stock": 100},
+    {"productId": "P002", "name": "Product 2", "price": 29.99, "stock": 50}
   ]
 }
 ```
@@ -311,156 +297,8 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForWritingBatch(
 }
 ```
 
----
-
-## Advanced Factory Functions
-
-### CreateBusinessLogicForReading
-
-Creates advanced read logic with custom SQL and parameter conditions.
-
-```vb
-Function CreateBusinessLogicForReading(
-    baseSQL As String,
-    parameterConditions As Dictionary(Of String, Object),
-    Optional defaultWhereClause As String = Nothing,
-    Optional fieldMappings As Dictionary(Of String, FieldMapping) = Nothing,
-    Optional useForJsonPath As Boolean = False,
-    Optional includeExecutedSQL As Boolean = True,
-    Optional prependSQL As String = Nothing
-) As Func(Of Object, JObject, Object)
-```
-
-**Parameters:**
-- `baseSQL`: Base SQL query. Use `{WHERE}` placeholder for dynamic WHERE clause
-- `parameterConditions`: Dictionary of parameter conditions
-- `defaultWhereClause`: WHERE clause applied when no parameters provided
-- `fieldMappings`: Optional field mappings (JSON to SQL)
-- `useForJsonPath`: If True, uses SQL Server's FOR JSON PATH for 40-60% better performance (default: False)
-- `includeExecutedSQL`: **NEW (v2.2)** If True, includes the executed SQL in the response (default: True for backward compatibility)
-- `prependSQL`: **NEW (v2.2)** Optional SQL to prepend before the query (e.g., "SET DATEFORMAT ymd;" for session configuration)
-
-**Returns:** Business logic function
-
-**Performance Note:**
-When `useForJsonPath = True`, SQL Server generates JSON natively in C++ code, which is significantly faster than VB dictionary conversion. Use this for simple queries without complex transformations.
-
-**When to use FOR JSON PATH (`useForJsonPath = True`):**
-- ✓ Simple SELECT queries with explicit column lists
-- ✓ High-volume data retrieval (>50 rows)
-- ✓ Reporting and analytics endpoints
-- ✓ Performance is critical
-- Expected improvement: 40-60% faster
-
-**When to use Standard Mode (`useForJsonPath = False`):**
-- ✓ Complex business logic or transformations
-- ✓ Need maximum flexibility
-- ✓ Debugging queries
-
-**Example (Standard Mode):**
-```vb
-Dim conditions As New Dictionary(Of String, Object)
-conditions.Add("startDate", DB.Global.CreateParameterCondition(
-    "startDate",
-    "OrderDate >= :startDate",
-    Nothing
-))
-conditions.Add("endDate", DB.Global.CreateParameterCondition(
-    "endDate",
-    "OrderDate <= :endDate",
-    Nothing
-))
-
-Dim logic = DB.Global.CreateBusinessLogicForReading(
-    "SELECT OrderId, CustomerId, OrderDate, TotalAmount FROM Orders {WHERE} ORDER BY OrderDate DESC",
-    conditions,
-    "OrderDate >= DATEADD(day, -30, GETDATE())",
-    Nothing,
-    False  ' Standard mode
-)
-```
-
-**Example (FOR JSON PATH Mode - Faster):**
-```vb
-Dim conditions = DB.Global.CreateParameterConditionsDictionary(
-    New String() {"startDate", "endDate"},
-    New String() {"OrderDate >= :startDate", "OrderDate <= :endDate"}
-)
-
-Dim fastLogic = DB.Global.CreateBusinessLogicForReading(
-    "SELECT OrderId, CustomerId, OrderDate, TotalAmount FROM Orders {WHERE} ORDER BY OrderDate DESC",
-    conditions,
-    "OrderDate >= DATEADD(day, -30, GETDATE())",
-    Nothing,
-    True,  ' FOR JSON PATH mode - 40-60% faster!
-    True,  ' Include executed SQL in response
-    Nothing ' No prepend SQL needed
-)
-```
-
-**Example (With Session Configuration via prependSQL):**
-```vb
-' Use prependSQL for session-level SQL configuration (v2.2+)
-Dim logic = DB.Global.CreateBusinessLogicForReading(
-    "SELECT OrderId, CustomerId, OrderDate FROM Orders {WHERE}",
-    conditions,
-    Nothing,
-    Nothing,
-    False,
-    True,
-    "SET DATEFORMAT ymd;"  ' Prepend session config before query
-)
-```
-
-**SQL Generation:**
-- `{WHERE}` replaced with `WHERE` + generated conditions
-- Conditions combined with `AND`
-- Default clause used when no parameters provided
-
----
-
-### CreateAdvancedBusinessLogicForWriting
-
-Creates advanced write logic with field mappings and custom SQL.
-
-```vb
-Function CreateAdvancedBusinessLogicForWriting(
-    tableName As String,
-    fieldMappings As Dictionary(Of String, FieldMapping),
-    keyFields As String(),
-    allowUpdates As Boolean,
-    Optional customExistenceCheckSQL As String = Nothing,
-    Optional customUpdateSQL As String = Nothing,
-    Optional customWhereClause As String = Nothing
-) As Func(Of Object, JObject, Object)
-```
-
-**Parameters:**
-- `tableName`: Table name
-- `fieldMappings`: Dictionary mapping JSON properties to SQL columns
-- `keyFields`: Array of key field names (SQL column names)
-- `allowUpdates`: Allow updates to existing records
-- `customExistenceCheckSQL`: Custom SQL to check if record exists
-- `customUpdateSQL`: Custom UPDATE SQL statement
-- `customWhereClause`: Custom WHERE clause for updates
-
-**Returns:** Business logic function
-
-**Example:**
-```vb
-Dim mappings As New Dictionary(Of String, FieldMapping)
-mappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True, Nothing))
-mappings.Add("email", DB.Global.CreateFieldMapping("email", "EMAIL_ADDRESS", True, Nothing))
-mappings.Add("status", DB.Global.CreateFieldMapping("status", "STATUS", False, "ACTIVE"))
-
-Dim logic = DB.Global.CreateAdvancedBusinessLogicForWriting(
-    "USERS",
-    mappings,
-    New String() {"USER_ID"},
-    True,
-    Nothing, Nothing, Nothing
-)
-```
+**Security Note:**
+Batch size is limited to 1000 records (MAX_BATCH_SIZE constant) to prevent DoS attacks and memory exhaustion.
 
 ---
 
@@ -1111,24 +949,31 @@ Public Sub New(
 
 ### Common Patterns
 
-#### Simple Read
+#### Read with Parameter Conditions
 ```vb
-DB.Global.CreateBusinessLogicForReading(tableName, fields, excludeFields, useLike)
-```
-
-#### Simple Write
-```vb
-DB.Global.CreateBusinessLogicForWriting(tableName, allFields, keyFields, allowUpdates)
-```
-
-#### Advanced Read with Conditions
-```vb
-DB.Global.CreateBusinessLogicForReading(baseSQL, conditions, excludeFields, defaultWhere, mappings)
+Dim conditions = DB.Global.CreateParameterConditionsDictionary(paramNames, sqlWhenPresent)
+Dim logic = DB.Global.CreateBusinessLogicForReading(baseSQL, conditions, defaultWhere, mappings, prependSQL)
 ```
 
 #### Batch Operations
 ```vb
-DB.Global.CreateBusinessLogicForWritingBatch(tableName, allFields, keyFields, allowUpdates)
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(jsonProps, sqlCols, isRequired, isPrimaryKey)
+Dim logic = DB.Global.CreateBusinessLogicForBatchWriting(tableName, mappings, allowUpdates)
+```
+
+#### Validation
+```vb
+Dim validator = DB.Global.CreateValidator(New String() {"param1", "param2"})
+```
+
+#### Complete Endpoint
+```vb
+Dim payload As JObject
+Dim payloadStr As String = ""
+Dim error = DB.Global.ValidatePayloadAndToken(DB, True, "Context", payload, payloadStr)
+If error IsNot Nothing Then Return error
+
+Return DB.Global.ProcessActionLink(DB, validator, businessLogic, "LogMsg", payload, payloadStr, True)
 ```
 
 ---
