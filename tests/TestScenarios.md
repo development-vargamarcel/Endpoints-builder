@@ -645,6 +645,265 @@ Public Sub TestSimpleRead()
 End Sub
 ```
 
+## Version 2.2 Feature Tests
+
+### 17. SQL Identifier Validation Tests
+
+#### Test Case 17.1: Valid Table Name
+**Input:**
+```vb
+tableName = "Users"
+```
+
+**Expected:** Validation passes
+
+#### Test Case 17.2: Invalid Table Name (SQL Injection Attempt)
+**Input:**
+```vb
+tableName = "Users; DROP TABLE Users--"
+```
+
+**Expected:** ArgumentException thrown with message about invalid identifier
+
+#### Test Case 17.3: Valid Schema.Table Notation
+**Input:**
+```vb
+tableName = "dbo.Users"
+```
+
+**Expected:** Validation passes
+
+#### Test Case 17.4: Bracket Notation
+**Input:**
+```vb
+tableName = "[User Orders]"
+```
+
+**Expected:** Validation passes (brackets allowed)
+
+#### Test Case 17.5: Invalid Characters
+**Input:**
+```vb
+tableName = "Users@#$"
+```
+
+**Expected:** ArgumentException thrown
+
+#### Test Case 17.6: Exceeds Maximum Length
+**Input:**
+```vb
+tableName = [String with 129 characters]
+```
+
+**Expected:** ArgumentException thrown (max length is 128)
+
+### 18. Batch Size Limit Tests
+
+#### Test Case 18.1: Batch Within Limit
+**Input:**
+```json
+{
+  "Records": [Array of 500 records]
+}
+```
+
+**Configuration:** MAX_BATCH_SIZE = 1000
+
+**Expected Result:** All records processed successfully
+
+#### Test Case 18.2: Batch Exceeds Limit
+**Input:**
+```json
+{
+  "Records": [Array of 1500 records]
+}
+```
+
+**Configuration:** MAX_BATCH_SIZE = 1000
+
+**Expected Result:**
+```json
+{
+  "Result": "KO",
+  "Reason": "Batch size 1500 exceeds maximum allowed size of 1000. Please split into smaller batches."
+}
+```
+
+#### Test Case 18.3: Batch Exactly at Limit
+**Input:**
+```json
+{
+  "Records": [Array of 1000 records]
+}
+```
+
+**Configuration:** MAX_BATCH_SIZE = 1000
+
+**Expected Result:** All 1000 records processed successfully
+
+### 19. Query Prepending Tests
+
+#### Test Case 19.1: Prepend SET DATEFORMAT
+**Configuration:**
+```vb
+prependSQL = "SET DATEFORMAT ymd;"
+```
+
+**Input:**
+```json
+{
+  "OrderDate": "2025-01-20"
+}
+```
+
+**Expected SQL:**
+```sql
+SET DATEFORMAT ymd; SELECT OrderId, OrderDate FROM Orders WHERE OrderDate = :OrderDate
+```
+
+**Expected Result:** Date parsed correctly regardless of server locale
+
+#### Test Case 19.2: Multiple SET Statements
+**Configuration:**
+```vb
+prependSQL = "SET DATEFORMAT ymd; SET NOCOUNT ON;"
+```
+
+**Expected SQL:**
+```sql
+SET DATEFORMAT ymd; SET NOCOUNT ON; SELECT * FROM Orders WHERE OrderId = :OrderId
+```
+
+**Expected Result:** All SET statements executed before main query
+
+#### Test Case 19.3: FOR JSON PATH with Prepend
+**Configuration:**
+```vb
+prependSQL = "SET DATEFORMAT ymd;"
+useForJsonPath = True
+```
+
+**Expected SQL:**
+```sql
+SET DATEFORMAT ymd; SELECT CAST(( SELECT * FROM Orders WHERE OrderId = :OrderId FOR JSON PATH, INCLUDE_NULL_VALUES ) AS NVARCHAR(MAX)) AS JsonResult
+```
+
+**Expected Result:** Prepend placed before outer SELECT CAST
+
+#### Test Case 19.4: Empty Prepend
+**Configuration:**
+```vb
+prependSQL = Nothing
+```
+
+**Expected Result:** No prepend SQL, query executes normally
+
+### 20. Property Cache Tests
+
+#### Test Case 20.1: Cache Hit
+**Scenario:** Access same property multiple times on same object
+
+**Expected Behavior:**
+- First access: Cache miss (builds cache)
+- Subsequent accesses: Cache hits (70-90% faster)
+- GetPropertyCacheStats() shows increasing hit rate
+
+#### Test Case 20.2: Cache Size Limit
+**Scenario:** Cache exceeds MAX_CACHE_SIZE (1000)
+
+**Expected Behavior:**
+- Cache automatically clears when limit exceeded
+- New cache created (thread-safe)
+- No exceptions thrown
+- Performance degrades slightly during rebuild
+
+#### Test Case 20.3: Cache Collision Protection
+**Scenario:** Two different objects with same hash code
+
+**Expected Behavior:**
+- Cached mapping validated against actual object
+- Invalid cache entries removed
+- Correct property value returned
+- No data corruption
+
+### 21. Composite Key Delimiter Tests
+
+#### Test Case 21.1: Simple Composite Key
+**Input:**
+```vb
+keyFields = {"OrderId", "ProductId"}
+recordParams = {OrderId: "123", ProductId: "456"}
+```
+
+**Expected Composite Key:** `"123␟456"` (using ASCII 31 delimiter)
+
+#### Test Case 21.2: Prevent Key Collision
+**Scenario 1:**
+```vb
+recordParams = {OrderId: "123", ProductId: "456|789"}
+```
+**Composite Key:** `"123␟456|789"`
+
+**Scenario 2:**
+```vb
+recordParams = {OrderId: "123|456", ProductId: "789"}
+```
+**Composite Key:** `"123|456␟789"`
+
+**Expected Behavior:** Both scenarios produce different keys (no collision)
+
+#### Test Case 21.3: NULL Key Field
+**Input:**
+```vb
+keyFields = {"OrderId", "ProductId"}
+recordParams = {OrderId: "123", ProductId: null}
+```
+
+**Expected Composite Key:** `"123␟[NULL]"`
+
+### 22. includeExecutedSQL Option Tests
+
+#### Test Case 22.1: Include SQL (Default)
+**Configuration:**
+```vb
+includeExecutedSQL = True  ' Default
+```
+
+**Expected Response:**
+```json
+{
+  "Result": "OK",
+  "ProvidedParameters": "UserId",
+  "ExecutedSQL": "SELECT UserId, Email FROM Users WHERE UserId = :UserId",
+  "Records": [...]
+}
+```
+
+#### Test Case 22.2: Exclude SQL
+**Configuration:**
+```vb
+includeExecutedSQL = False
+```
+
+**Expected Response:**
+```json
+{
+  "Result": "OK",
+  "ProvidedParameters": "UserId",
+  "Records": [...]
+}
+```
+
+**Note:** ExecutedSQL field should NOT be present
+
+#### Test Case 22.3: Backward Compatibility
+**Configuration:**
+```vb
+' Parameter not specified (uses default)
+```
+
+**Expected Behavior:** includeExecutedSQL defaults to True, maintaining backward compatibility
+
 ## Continuous Integration
 
 Run tests on:

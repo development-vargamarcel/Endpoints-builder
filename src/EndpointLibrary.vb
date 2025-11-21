@@ -1837,9 +1837,10 @@ Public Function CreateFieldMapping(
     jsonProp As System.String,
     sqlCol As System.String,
     Optional isRequired As System.Boolean = False,
+    Optional isPrimaryKey As System.Boolean = False,
     Optional defaultVal As System.Object = Nothing
 ) As FieldMapping
-    Return New FieldMapping(jsonProp, sqlCol, isRequired, defaultVal)
+    Return New FieldMapping(jsonProp, sqlCol, isRequired, isPrimaryKey, defaultVal)
 End Function
 
 ''' <summary>

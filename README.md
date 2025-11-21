@@ -20,6 +20,7 @@ A production-ready Visual Basic .NET library for building flexible, secure REST 
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Configuration Constants](#configuration-constants)
 - [Core Concepts](#core-concepts)
 - [Library Options](#library-options)
 - [API Reference](#api-reference)
@@ -82,6 +83,35 @@ Return DB.Global.ProcessActionLink(
     False
 )
 ```
+
+## Configuration Constants
+
+The library uses several configuration constants (v2.2+) to ensure security and performance:
+
+### MAX_BATCH_SIZE
+**Value:** `1000`
+
+Maximum number of records allowed in a single batch operation. Protects against:
+- Denial of Service (DoS) attacks
+- Memory exhaustion
+- Database connection timeouts
+
+Batch requests exceeding this limit will be rejected with a clear error message.
+
+### MAX_SQL_IDENTIFIER_LENGTH
+**Value:** `128`
+
+Maximum length for SQL identifiers (table names, column names). Follows SQL Server's standard identifier length limit and is enforced by `ValidateSqlIdentifier()` for security.
+
+### MAX_CACHE_SIZE
+**Value:** `1000`
+
+Maximum number of objects cached in the property name cache. When exceeded, the cache is automatically cleared to prevent memory issues.
+
+### COMPOSITE_KEY_DELIMITER
+**Value:** `ASCII 31 (Unit Separator)`
+
+Internal delimiter used for composite key generation in batch operations. Uses a safe ASCII control character to prevent key collisions (e.g., prevents ambiguity between "123|456" as a single key vs. two keys "123" and "456").
 
 ## Core Concepts
 
@@ -399,7 +429,8 @@ Dim validator = DB.Global.CreateValidator(
 
 ```vb
 Dim mappings As New Dictionary(Of String, FieldMapping)
-mappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True))
+mappings.Add("userId", DB.Global.CreateFieldMapping("userId", "USER_ID", True, False, Nothing))
+mappings.Add("email", DB.Global.CreateFieldMapping("email", "EMAIL_ADDRESS", True, False, Nothing))
 ```
 
 ## Advanced Features
