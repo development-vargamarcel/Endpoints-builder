@@ -145,18 +145,19 @@ All examples are **fully documented** with:
 
 ### Performance Optimization
 ```vb
-' ✅ DO: Use FOR JSON PATH for large result sets (40-60% faster)
+' ✅ DO: FOR JSON PATH optimization is automatic (40-60% faster)
+' No configuration needed - library automatically uses optimal mode
 Dim logic = DB.Global.CreateBusinessLogicForReading(
-    sql, conditions, Nothing, Nothing,
-    True  ' Enable FOR JSON PATH
+    sql, conditions, Nothing, Nothing, Nothing
 )
 
 ' ✅ DO: Use batch operations for 10+ records (50-90% faster)
 Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
-    table, mappings, Nothing, True
+    table, mappings, True  ' allowUpdates
 )
 
 ' ✅ DO: Optimal batch size is 100-1000 records
+' Maximum batch size is 1000 (enforced by MAX_BATCH_SIZE constant)
 ```
 
 ### Security Hardening
@@ -182,14 +183,15 @@ End If
 Dim mappings = DB.Global.CreateFieldMappingsDictionary(
     jsonProps, sqlCols,
     isRequiredArray,
-    isPrimaryKeyArray,  ' NEW in v2.1
+    isPrimaryKeyArray,  ' NEW in v2.1 - mark which fields are primary keys
     defaultValues
 )
 
-' No need for separate keyFields parameter anymore!
-Dim logic = DB.Global.CreateBusinessLogicForWriting(
-    table, mappings
-    ' keyFields parameter omitted - extracted from mappings
+' Primary keys are automatically extracted from mappings!
+Dim logic = DB.Global.CreateBusinessLogicForBatchWriting(
+    table,
+    mappings,  ' Library extracts keys from IsPrimaryKey = True fields
+    True       ' allowUpdates
 )
 ```
 
@@ -197,8 +199,11 @@ Dim logic = DB.Global.CreateBusinessLogicForWriting(
 ```vb
 ' ✅ DO: Use prependSQL for session configuration
 Dim logic = DB.Global.CreateBusinessLogicForReading(
-    sql, conditions, Nothing, Nothing, True, False,
-    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' prependSQL
+    sql,
+    conditions,
+    Nothing,
+    Nothing,
+    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' prependSQL (5th parameter)
 )
 ```
 

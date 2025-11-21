@@ -247,15 +247,15 @@ searchConditions.Add("MinPrice", DB.Global.CreateParameterCondition(
 searchConditions.Add("IsActive", DB.Global.CreateParameterCondition(
     "IsActive", "IsActive = :IsActive", Nothing))
 
-' FOR JSON PATH: SQL Server generates JSON directly (40-60% faster)
-' Best for: Simple queries without complex transformations
+' Automatic FOR JSON PATH: Library automatically uses FOR JSON PATH for 40-60% faster performance
+' with automatic fallback to standard mode if needed. No configuration required!
 Dim fastReadLogic = DB.Global.CreateBusinessLogicForReading(
     "SELECT ProductId, ProductName, SKU, Category, Price, Stock, IsActive " &
     "FROM Products {WHERE} ORDER BY ProductName",
     searchConditions,
     "IsActive = 1",  ' Default: only active products
     Nothing,
-    True  ' useForJsonPath = True (PERFORMANCE BOOST!)
+    Nothing  ' No prepend SQL needed
 )
 
 ' Validator: No required params (all filters are optional for flexible queries)
@@ -308,43 +308,23 @@ Dim endTime As System.DateTime
 Dim testSQL = "SELECT TOP 100 ProductId, ProductName, Category, Price, Stock FROM Products WHERE IsActive = 1"
 Dim testConditions As New System.Collections.Generic.Dictionary(Of System.String, System.Object)
 
-' Test 1: Standard Mode
+' NOTE: The library now automatically uses FOR JSON PATH with fallback
+' This test demonstrates the automatic optimization in action
 startTime = System.DateTime.Now
-Dim standardLogic = DB.Global.CreateBusinessLogicForReading(
-    testSQL, testConditions, Nothing, Nothing, False)
-Dim standardResult = standardLogic(DB, ParsedPayload5)
+Dim readLogic = DB.Global.CreateBusinessLogicForReading(
+    testSQL, testConditions, Nothing, Nothing, Nothing)
+Dim result = readLogic(DB, ParsedPayload5)
 endTime = System.DateTime.Now
-Dim standardTime = (endTime - startTime).TotalMilliseconds
+Dim queryTime = (endTime - startTime).TotalMilliseconds
 
-' Test 2: FOR JSON PATH Mode
-startTime = System.DateTime.Now
-Dim jsonPathLogic = DB.Global.CreateBusinessLogicForReading(
-    testSQL, testConditions, Nothing, Nothing, True)
-Dim jsonPathResult = jsonPathLogic(DB, ParsedPayload5)
-endTime = System.DateTime.Now
-Dim jsonPathTime = (endTime - startTime).TotalMilliseconds
-
-' Calculate improvement
-Dim improvement As System.Double = 0
-If standardTime > 0 Then
-    improvement = ((standardTime - jsonPathTime) / standardTime) * 100
-End If
+' The library automatically attempted FOR JSON PATH first for best performance
 
 Return Newtonsoft.Json.JsonConvert.SerializeObject(New With {
     .Result = "OK",
-    .PerformanceComparison = New With {
-        .StandardMode_ms = System.Math.Round(standardTime, 2),
-        .ForJsonPathMode_ms = System.Math.Round(jsonPathTime, 2),
-        .ImprovementPercent = System.Math.Round(improvement, 2),
-        .ImprovementDescription = $"FOR JSON PATH was {System.Math.Round(improvement, 1)}% faster"
-    },
-    .Recommendation = If(improvement > 20,
-        "FOR JSON PATH provides significant performance improvement - recommended for this query",
-        "Performance difference is minimal - use standard mode for flexibility"),
-    .Results = New With {
-        .StandardMode = standardResult,
-        .ForJsonPathMode = jsonPathResult
-    }
+    .QueryTime_ms = System.Math.Round(queryTime, 2),
+    .OptimizationNote = "Library automatically uses FOR JSON PATH (40-60% faster) with automatic fallback to standard mode if needed",
+    .PerformanceBenefit = "No configuration required - optimal performance is automatic!",
+    .QueryResult = result
 })
 
 

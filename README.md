@@ -42,12 +42,24 @@ A production-ready Visual Basic .NET library for building flexible, secure REST 
 ### Basic Read Operation
 
 ```vb
-' Create a simple read endpoint
+' Parse and validate payload
+Dim StringPayload = "" : Dim ParsedPayload
+Dim PayloadError = DB.Global.ValidatePayloadAndToken(DB, False, "UsersRead", ParsedPayload, StringPayload)
+If PayloadError IsNot Nothing Then Return PayloadError
+
+' Create search conditions
+Dim conditions = DB.Global.CreateParameterConditionsDictionary(
+    New String() {"UserId", "Email"},
+    New String() {"UserId = :UserId", "Email LIKE :Email"}
+)
+
+' Create read logic
 Dim readLogic = DB.Global.CreateBusinessLogicForReading(
-    "Users",                                    ' Table name
-    New String() {"UserId", "Email", "Name"},  ' Searchable fields
-    New String() {"Password"},                  ' Exclude fields
-    True                                        ' Use LIKE operator
+    "SELECT UserId, Email, Name, Department FROM Users {WHERE}",
+    conditions,
+    Nothing,  ' No default WHERE
+    Nothing,  ' No field mappings
+    Nothing   ' No prepend SQL
 )
 
 ' Process the request
@@ -62,22 +74,35 @@ Return DB.Global.ProcessActionLink(
 )
 ```
 
-### Basic Write Operation
+### Batch Write Operation
 
 ```vb
-' Create a write endpoint with upsert capability
-Dim writeLogic = DB.Global.CreateBusinessLogicForWriting(
-    "Users",                                        ' Table name
-    New String() {"UserId", "Email", "Name"},      ' All fields
-    New String() {"UserId"},                       ' Key fields (required)
-    True                                           ' Allow updates
+' Parse and validate payload
+Dim StringPayload = "" : Dim ParsedPayload
+Dim PayloadError = DB.Global.ValidatePayloadAndToken(DB, False, "UsersWrite", ParsedPayload, StringPayload)
+If PayloadError IsNot Nothing Then Return PayloadError
+
+' Create field mappings
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"userId", "email", "name"},
+    New String() {"UserId", "Email", "Name"},
+    New Boolean() {True, True, False},      ' isRequired
+    New Boolean() {True, False, False},     ' isPrimaryKey
+    Nothing
+)
+
+' Create batch write logic
+Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
+    "Users",
+    mappings,
+    True  ' Allow updates
 )
 
 Return DB.Global.ProcessActionLink(
     DB,
-    DB.Global.CreateValidator(New String() {"UserId", "Email"}),
-    writeLogic,
-    "User created/updated",
+    DB.Global.CreateValidator(New String() {"Records"}),
+    batchLogic,
+    "Users batch update",
     ParsedPayload,
     StringPayload,
     False
