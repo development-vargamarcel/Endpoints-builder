@@ -1,22 +1,22 @@
 # Advanced Examples for EndpointLibrary
 
-This directory contains **advanced, production-ready examples** demonstrating the full capabilities of the EndpointLibrary. All examples follow best practices for security, performance, and maintainability.
+This directory contains **advanced, production-ready examples** demonstrating the full capabilities of the EndpointLibrary. Each example represents the most advanced pattern for its operation type.
 
 ## 📁 Example Files Overview
 
 ### 🏢 EnterpriseEndpointExample.vb
-**Complete production-ready endpoint pattern**
+**Complete production-ready multi-operation endpoint**
 
-A comprehensive, real-world implementation showcasing:
+The most comprehensive example showcasing a real-world implementation:
 - Multi-operation endpoint using `DestinationIdentifier` pattern
-- Token validation and role-based access control
+- Token validation and role-based access control (RBAC)
 - Primary key declaration in field mappings (v2.1+)
 - Batch operations with performance optimization
 - Custom SQL operations and audit logging
+- Complex search with flexible filtering
+- Field mappings and mass assignment protection
 - Error handling and validation
 - Soft delete pattern
-
-**Use this as a template** for building enterprise-grade endpoints.
 
 **Operations included:**
 - `orders-search` - Complex search with role-based filtering
@@ -26,24 +26,29 @@ A comprehensive, real-world implementation showcasing:
 - `orders-statistics` - Analytical queries with aggregations
 - `orders-soft-delete` - Soft delete with authorization
 
+**Use this as your primary template** for building enterprise-grade endpoints.
+
 ---
 
 ### ⚡ AdvancedBatchAndPerformanceExample.vb
-**High-performance batch processing**
+**High-performance batch processing and optimization**
 
-Demonstrates performance optimization techniques:
+Focused on performance optimization techniques:
 - Batch insert/update (**50-90% faster** than individual operations)
 - FOR JSON PATH optimization (**40-60% faster** queries)
 - Bulk existence checking with composite keys
 - Insert-only mode for maximum performance
 - Error handling and partial success scenarios
 - Performance comparison and monitoring
-- Batch size optimization strategies
+- Batch size optimization strategies (100-1000 records optimal)
 
 **Key insights:**
 - Optimal batch size: 100-1000 records
 - Automatic fallback for FOR JSON PATH errors
 - Detailed error reporting per record
+- Thread-safe composite key handling with ASCII 31 delimiter
+
+**Perfect for:** High-throughput data processing and bulk operations
 
 ---
 
@@ -62,113 +67,27 @@ Advanced SQL patterns and techniques:
 - Cohort analysis
 - Full-text search simulation
 
-**Perfect for:** Reporting, analytics, and complex business logic
-
----
-
-### 🗄️ AdvancedCRUDExample.vb
-**Complete CRUD operations example**
-
-Originally `P_TestingTableArticles_Example.vb`, this example shows:
-- Complete CRUD workflow with real database table
-- Multiple read patterns with flexible filtering
-- Date range and numeric filtering
-- FOR JSON PATH performance mode
-- Aggregation queries for statistics
-- Insert-only and upsert patterns
-- Batch operations
-- Custom SQL for metric tracking
-- Complete endpoint with DestinationIdentifier routing
-
-**Includes:** SQL setup file (`AdvancedCRUDExample_Setup.sql`)
-
----
-
-### 🔐 AdvancedSecurityPatterns.vb
-**Security best practices and patterns**
-
-Comprehensive security implementation:
-- Token validation (production mode)
-- Role-based access control (RBAC)
-- Field exclusion for sensitive data
-- Parameterized queries (SQL injection prevention)
-- Input validation and whitelisting
-- Mass assignment protection
-- Rate limiting patterns
-- Audit logging
-- Authorization checks
-- Secure batch operations
-
-**Security checklist included** with 11 security controls
-
----
-
-### 🔑 AdvancedPrimaryKeyExample.vb
-**Primary key declaration feature (v2.1+)**
-
-New feature demonstration:
-- Primary key declaration in field mappings
-- Composite primary key handling
-- Insert-only with primary key validation
-- Batch operations with PK declaration
-- Backward compatibility with old approach
-- Required fields vs. primary keys distinction
-
-**Key benefit:** No need to pass `keyFields` parameter separately
-
----
-
-### 🔄 AdvancedFieldMappingExample.vb
-**JSON-to-SQL field mapping patterns**
-
-Comprehensive field mapping scenarios:
-- Basic camelCase to SNAKE_CASE conversion
-- Required vs. optional fields
-- Default value application
-- Reading with field mappings
-- Complex legacy database column mapping
-- Dynamic field mapping from configuration
-- Validation combined with mappings
-- Strict mapping (exclude unmapped fields)
-- Versioned API support
-- Audit trail with automatic field population
-
-**10 detailed examples** covering all mapping scenarios
+**Perfect for:** Reporting, analytics, dashboards, and complex business intelligence
 
 ---
 
 ### 🛡️ RobustnessImprovementsExample.vb
 **Security and robustness features (v2.2+)**
 
-New robustness and security enhancements:
+Latest robustness and security enhancements:
 - Query prepending with `prependSQL` parameter
 - SET DATEFORMAT for consistent date parsing
 - SET NOCOUNT ON for performance
-- Transaction isolation level control
-- Lock timeout configuration
-- SQL injection prevention enhancements
-- Resource cleanup patterns
-- Error handling improvements
-- Session-level SQL configuration
-- Cross-locale compatibility
+- SQL injection prevention (identifier validation)
+- Batch size limits (prevents DoS attacks)
+- Array length validation
+- Integer overflow protection
+- Resource cleanup patterns with try-finally
+- Case-insensitive placeholder support
+- DBNull to JSON null conversion
+- Composite key collision prevention
 
-**10 comprehensive examples** demonstrating v2.2+ features
-
----
-
-### 📄 AdvancedCRUDExample_Setup.sql
-**Database setup script**
-
-SQL Server setup for the CRUD example:
-- Complete table creation
-- Sample data insertion
-- Query examples (9 patterns)
-- Update examples (4 scenarios)
-- Delete examples
-- Performance optimization with FOR JSON PATH
-- Cleanup procedures
-
-**Run this first** before testing AdvancedCRUDExample.vb
+**10 comprehensive examples** demonstrating v2.2+ features for production-hardening.
 
 ---
 
@@ -185,21 +104,10 @@ SQL Server setup for the CRUD example:
 **For complex queries:**
 → Start with `AdvancedQueryingExample.vb`
 
-**For security hardening:**
-→ Start with `AdvancedSecurityPatterns.vb`
-
-**For robustness and query prepending (v2.2+):**
+**For robustness and security hardening (v2.2+):**
 → Start with `RobustnessImprovementsExample.vb`
 
-### 2. Database Setup
-
-If using the CRUD example:
-```sql
--- Execute the setup script in SQL Server Management Studio
--- File: AdvancedCRUDExample_Setup.sql
-```
-
-### 3. Customize for Your Use Case
+### 2. Customize for Your Use Case
 
 All examples are **fully documented** with:
 - ✅ Complete code comments
@@ -213,20 +121,23 @@ All examples are **fully documented** with:
 
 ## 📊 Feature Comparison
 
-| Feature | Enterprise | Batch/Perf | Querying | Security | PK Decl | Field Map | CRUD | Robustness |
-|---------|-----------|-----------|----------|----------|---------|-----------|------|------------|
-| Token Validation | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| Role-Based Access | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| Batch Operations | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ✅ | ⚪ |
-| FOR JSON PATH | ✅ | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
-| Complex Queries | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
-| Field Mappings | ✅ | ✅ | ⚪ | ⚪ | ✅ | ✅ | ✅ | ⚪ |
-| Primary Key Decl | ✅ | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ |
-| Audit Logging | ✅ | ⚪ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ |
-| Custom SQL | ✅ | ⚪ | ✅ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
-| Multi-Operation | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ | ⚪ |
-| Query Prepending | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ |
-| Session Config | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ✅ |
+| Feature | Enterprise | Batch/Perf | Querying | Robustness |
+|---------|-----------|-----------|----------|------------|
+| Token Validation | ✅ | ⚪ | ⚪ | ⚪ |
+| Role-Based Access | ✅ | ⚪ | ⚪ | ⚪ |
+| Batch Operations | ✅ | ✅ | ⚪ | ✅ |
+| FOR JSON PATH | ✅ | ✅ | ✅ | ⚪ |
+| Complex Queries | ⚪ | ⚪ | ✅ | ⚪ |
+| Field Mappings | ✅ | ✅ | ⚪ | ✅ |
+| Primary Key Decl | ✅ | ✅ | ⚪ | ✅ |
+| Audit Logging | ✅ | ⚪ | ⚪ | ⚪ |
+| Custom SQL | ✅ | ⚪ | ✅ | ⚪ |
+| Multi-Operation | ✅ | ⚪ | ⚪ | ⚪ |
+| Query Prepending | ⚪ | ⚪ | ⚪ | ✅ |
+| Session Config | ⚪ | ⚪ | ⚪ | ✅ |
+| JOINs & CTEs | ⚪ | ⚪ | ✅ | ⚪ |
+| Window Functions | ⚪ | ⚪ | ✅ | ⚪ |
+| Security Hardening | ✅ | ⚪ | ⚪ | ✅ |
 
 ---
 
@@ -279,6 +190,15 @@ Dim mappings = DB.Global.CreateFieldMappingsDictionary(
 Dim logic = DB.Global.CreateBusinessLogicForWriting(
     table, mappings
     ' keyFields parameter omitted - extracted from mappings
+)
+```
+
+### Query Prepending (v2.2+)
+```vb
+' ✅ DO: Use prependSQL for session configuration
+Dim logic = DB.Global.CreateBusinessLogicForReading(
+    sql, conditions, Nothing, Nothing, True, False,
+    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' prependSQL
 )
 ```
 
@@ -339,15 +259,6 @@ End If
 
 ---
 
-## 📚 Additional Resources
-
-- **Main README**: `/README.md` - Project overview and setup
-- **API Documentation**: `/docs/API.md` - Complete API reference
-- **Security Guide**: `/docs/SECURITY.md` - Security best practices
-- **Test Scenarios**: `/tests/TestScenarios.md` - Comprehensive test cases
-
----
-
 ## 💡 Tips for Production Deployment
 
 1. **Enable Token Validation**: Set `CheckToken = True` in all production endpoints
@@ -357,7 +268,7 @@ End If
 5. **Log All Operations**: Use `LogCustom` for audit trails and troubleshooting
 6. **Test at Scale**: Always test with production-scale data before deployment
 7. **Index Your Database**: Add appropriate indexes based on query patterns
-8. **Review Security**: Follow the security checklist in AdvancedSecurityPatterns.vb
+8. **Review Security**: Follow the security patterns in EnterpriseEndpointExample.vb
 9. **Version Your API**: Use field mappings to support multiple API versions
 10. **Document Your Endpoints**: Include example payloads and responses in documentation
 
@@ -365,7 +276,8 @@ End If
 
 ## 🔄 Version History
 
-- **v2.1+**: Primary key declaration in field mappings
+- **v2.2**: Query prepending, robustness improvements, security enhancements
+- **v2.1**: Primary key declaration in field mappings
 - **v2.0**: FOR JSON PATH automatic fallback
 - **v1.5**: Batch operations optimization
 - **v1.0**: Initial release with basic CRUD
@@ -394,8 +306,8 @@ These examples represent best practices. When contributing new examples:
 
 ---
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2025-11-21
 **Library Version**: 2.2+
-**Examples Count**: 8 advanced examples + 1 SQL setup file
+**Examples Count**: 4 advanced examples (one for each main operation type)
 
 For questions or issues, please refer to the main project documentation or create an issue in the repository.
