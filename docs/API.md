@@ -244,7 +244,8 @@ Creates batch write logic for multiple records with automatic bulk existence che
 Function CreateBusinessLogicForBatchWriting(
     tableName As String,
     fieldMappings As Dictionary(Of String, FieldMapping),
-    Optional allowUpdates As Boolean = True
+    Optional allowUpdates As Boolean = True,
+    Optional prependSQL As String = Nothing
 ) As Func(Of Object, JObject, Object)
 ```
 
@@ -252,6 +253,7 @@ Function CreateBusinessLogicForBatchWriting(
 - `tableName`: Table name
 - `fieldMappings`: Dictionary mapping JSON properties to SQL columns (must include fields with `IsPrimaryKey = True`)
 - `allowUpdates`: Allow updates to existing records (default: True)
+- `prependSQL`: Optional SQL to prepend before batch operations (e.g., "SET DATEFORMAT ymd;", "SET NOCOUNT ON;"). Applied to bulk existence check queries, INSERT queries, and UPDATE queries
 
 **Returns:** Business logic function
 
@@ -272,6 +274,25 @@ Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
     mappings,
     True  ' Allow updates
+)
+```
+
+**Example (With Session Configuration via prependSQL):**
+```vb
+' Use prependSQL for session-level SQL configuration before batch operations
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"orderId", "orderDate", "amount"},
+    New String() {"OrderId", "OrderDate", "Amount"},
+    New Boolean() {True, True, True},        ' isRequired
+    New Boolean() {True, False, False},      ' isPrimaryKey
+    Nothing
+)
+
+Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
+    "Orders",
+    mappings,
+    True,                      ' Allow updates
+    "SET DATEFORMAT ymd;"      ' Prepend session config before all batch queries
 )
 ```
 
@@ -958,7 +979,7 @@ Dim logic = DB.Global.CreateBusinessLogicForReading(baseSQL, conditions, default
 #### Batch Operations
 ```vb
 Dim mappings = DB.Global.CreateFieldMappingsDictionary(jsonProps, sqlCols, isRequired, isPrimaryKey)
-Dim logic = DB.Global.CreateBusinessLogicForBatchWriting(tableName, mappings, allowUpdates)
+Dim logic = DB.Global.CreateBusinessLogicForBatchWriting(tableName, mappings, allowUpdates, prependSQL)
 ```
 
 #### Validation

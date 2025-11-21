@@ -395,21 +395,15 @@ See the `examples/` directory for **advanced, production-ready examples**:
 
 ### 🏢 Production-Ready Examples
 
-- **EnterpriseEndpointExample.vb**: Complete production endpoint with token validation, role-based access, batch operations, and audit logging
-- **AdvancedBatchAndPerformanceExample.vb**: High-performance batch processing (50-90% faster) with FOR JSON PATH optimization (40-60% faster)
-- **AdvancedQueryingExample.vb**: Complex filtering, aggregations, JOINs, subqueries, window functions, and analytical queries
-- **AdvancedCRUDExample.vb**: Complete CRUD workflow with multiple operation patterns and DestinationIdentifier routing
-- **AdvancedSecurityPatterns.vb**: Comprehensive security implementation with 11 security controls
-- **AdvancedPrimaryKeyExample.vb**: Primary key declaration in field mappings (v2.1+ feature)
-- **AdvancedFieldMappingExample.vb**: 10 comprehensive field mapping scenarios
-- **RobustnessImprovementsExample.vb**: Security and robustness features with 10 examples (v2.2+ features)
+- **EnterpriseEndpointExample.vb**: Complete production endpoint with token validation, role-based access, batch operations, and audit logging - showcasing all major operation types (GET, POST, PUT, PATCH, DELETE, analytics)
+- **AdvancedBatchAndPerformanceExample.vb**: High-performance batch processing (50-90% faster) with optimization techniques, error handling, composite keys, and prependSQL usage
+- **AdvancedQueryingExample.vb**: Complex filtering, aggregations, JOINs, subqueries, window functions, and analytical queries demonstrating advanced SELECT operations
 
 ### 📄 Supporting Files
 
-- **AdvancedCRUDExample_Setup.sql**: Database setup script with table creation and sample data
 - **README.md**: Detailed examples documentation with feature comparison and best practices
 
-**👉 Start with `EnterpriseEndpointExample.vb` for a complete template**
+**👉 Start with `EnterpriseEndpointExample.vb` for a complete template covering all operation types**
 
 ## Security Best Practices
 
@@ -561,13 +555,47 @@ Dim readLogicMultiple = DB.Global.CreateBusinessLogicForReading(
 - `SET LOCK_TIMEOUT 5000;` - Set lock timeout to 5 seconds
 - `SET ARITHABORT ON;` - Control arithmetic error handling
 
+#### Batch Operations with prependSQL
+
+The `prependSQL` parameter is also available for batch writing operations to ensure consistent session configuration across all batch operations (bulk existence check, INSERTs, and UPDATEs):
+
+```vb
+' Create field mappings with date fields
+Dim mappings = DB.Global.CreateFieldMappingsDictionary(
+    New String() {"orderId", "orderDate", "amount"},
+    New String() {"OrderId", "OrderDate", "Amount"},
+    New Boolean() {True, True, True},       ' All required
+    New Boolean() {True, False, False},     ' orderId is primary key
+    Nothing
+)
+
+' Use prependSQL to configure date format for all batch operations
+Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
+    "Orders",
+    mappings,
+    True,                                  ' Allow updates
+    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' prependSQL - applied to all operations
+)
+
+Return DB.Global.ProcessActionLink(
+    DB,
+    DB.Global.CreateValidator(New String() {"Records"}),
+    batchLogic,
+    "Batch operation completed",
+    ParsedPayload,
+    StringPayload,
+    False
+)
+```
+
 **Benefits:**
 - Ensures consistent behavior across different server configurations
 - Eliminates date parsing issues with international formats
 - Improves performance with NOCOUNT ON
 - Session-specific settings without affecting other connections
+- Applied to ALL batch operations: bulk existence check, INSERT, and UPDATE queries
 
-See `examples/RobustnessImprovementsExample.vb` for comprehensive examples.
+See `examples/AdvancedBatchAndPerformanceExample.vb` for comprehensive batch examples with prependSQL.
 
 ### Custom SQL with Placeholders
 

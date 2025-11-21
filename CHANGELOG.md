@@ -5,6 +5,43 @@ All notable changes to the Endpoint Library will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-11-21
+
+### Added
+- **prependSQL for Batch Operations**: Added `prependSQL` parameter to `CreateBusinessLogicForBatchWriting()`
+  - Allows prepending SQL statements before batch operations (e.g., `"SET DATEFORMAT ymd; SET NOCOUNT ON;"`)
+  - Applied to all batch operations: bulk existence check, INSERT queries, and UPDATE queries
+  - Ensures consistent session configuration across all batch operations
+  - Optional parameter (default: Nothing) - fully backward compatible
+- **Documentation Guidelines**: New `docs/DOCUMENTATION_GUIDELINES.md` file
+  - Establishes minimalism principle for documentation
+  - One comprehensive example per operation type policy
+  - Maintenance rules and review triggers
+  - Documentation style guide
+
+### Changed
+- **Updated Examples**: Enhanced examples with prependSQL usage
+  - `AdvancedBatchAndPerformanceExample.vb`: Added Example 7 demonstrating prependSQL with batch operations
+  - `EnterpriseEndpointExample.vb`: Updated batch operation to use prependSQL for session configuration
+  - All batch examples now use correct function signatures (removed deprecated `keyFields` parameter)
+- **Updated Documentation**:
+  - `docs/API.md`: Added prependSQL parameter documentation for batch writing operations
+  - `README.md`: Added batch operations section with prependSQL examples
+  - `examples/README.md`: Streamlined to reference only 3 core examples per documentation guidelines
+
+### Removed
+- **Redundant Documentation Files**:
+  - `docs/PERFORMANCE_ANALYSIS.md` (redundant with PERFORMANCE_IMPROVEMENTS.md)
+  - `REFACTORING_SUMMARY.md` (migration guide no longer needed after multiple versions)
+- **Outdated Examples**:
+  - `examples/RobustnessImprovementsExample.vb` (features integrated into remaining examples)
+
+### Technical Details
+- `BusinessLogicBatchWriterWrapper` constructor now accepts optional `prependSQL` parameter
+- `BulkExistenceCheck()` function updated to accept and apply `prependSQL` parameter
+- All SQL operations in batch writing now prepend configured SQL when provided
+- Maintains backward compatibility - existing code continues to work without changes
+
 ## [2.2.0] - 2025-11-20
 
 ### Added - Robustness and Security Improvements
