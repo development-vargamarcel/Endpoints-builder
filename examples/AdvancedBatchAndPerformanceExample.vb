@@ -54,7 +54,6 @@ Dim batchMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
     batchMappings,
-    Nothing,  ' Extract PK from mappings
     True      ' Allow updates (upsert mode)
 )
 
@@ -124,7 +123,6 @@ Dim insertOnlyMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim insertOnlyLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
     insertOnlyMappings,
-    Nothing,
     False  ' allowUpdates = False (insert only - FASTEST mode)
 )
 
@@ -178,7 +176,6 @@ Dim strictMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim strictBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
     strictMappings,
-    Nothing,
     True
 )
 
@@ -354,7 +351,6 @@ Dim compositeKeyMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim compositeKeyBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "OrderItems",
     compositeKeyMappings,
-    Nothing,  ' Extract composite PK from mappings
     True
 )
 
@@ -377,7 +373,76 @@ Return DB.Global.ProcessActionLink(
 
 
 ' ===================================
-' EXAMPLE 7: BATCH SIZE OPTIMIZATION
+' EXAMPLE 7: PREPEND SQL FOR BATCH OPERATIONS
+' ===================================
+' Configure SQL session settings for batch operations (e.g., date format, isolation level)
+
+Dim StringPayload7 = "" : Dim ParsedPayload7
+Dim PayloadError7 = DB.Global.ValidatePayloadAndToken(DB, False, "BatchWithPrependSQL", ParsedPayload7, StringPayload7)
+If PayloadError7 IsNot Nothing Then
+    Return PayloadError7
+End If
+
+' Use prependSQL to set session configuration before batch operations
+' Common use cases:
+' - SET DATEFORMAT ymd; (for international date handling)
+' - SET NOCOUNT ON; (reduce network traffic)
+' - SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; (for reporting)
+' - SET ANSI_WARNINGS OFF; (suppress specific warnings)
+
+Dim prependMappings = DB.Global.CreateFieldMappingsDictionary(
+    New System.String() {"productId", "productName", "releaseDate", "price", "stock"},
+    New System.String() {"ProductId", "ProductName", "ReleaseDate", "Price", "Stock"},
+    New Boolean() {True, True, True, False, False},
+    New Boolean() {True, False, False, False, False},
+    New Object() {Nothing, Nothing, Nothing, 0, 0}
+)
+
+' prependSQL ensures date format is correct for all batch operations
+' This SQL is prepended to: bulk existence check, INSERT queries, and UPDATE queries
+Dim prependBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
+    "Products",
+    prependMappings,
+    True,
+    "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' Prepend SQL for session configuration
+)
+
+Return DB.Global.ProcessActionLink(
+    DB,
+    DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
+    prependBatchLogic,
+    "Batch operation with prepend SQL completed",
+    ParsedPayload7, StringPayload7, False
+)
+
+' PAYLOAD WITH INTERNATIONAL DATE FORMAT:
+' {
+'   "Records": [
+'     {"productId": "P001", "productName": "Product 1", "releaseDate": "2024-03-15", "price": 29.99},
+'     {"productId": "P002", "productName": "Product 2", "releaseDate": "2024-06-20", "price": 49.99},
+'     {"productId": "P003", "productName": "Product 3", "releaseDate": "2024-12-01", "price": 19.99}
+'   ]
+' }
+'
+' BENEFITS OF PREPENDSQL:
+' ✓ Ensures consistent date handling across all SQL queries
+' ✓ Applies to bulk existence check + all INSERT/UPDATE operations
+' ✓ Reduces network traffic with SET NOCOUNT ON
+' ✓ Sets transaction isolation level for batch operations
+' ✓ Enables regional date format compatibility (yyyy-MM-dd format)
+'
+' COMMON PREPENDSQL PATTERNS:
+' - Date handling: "SET DATEFORMAT ymd;"
+' - Performance: "SET NOCOUNT ON;"
+' - Isolation: "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;"
+' - Warnings: "SET ANSI_WARNINGS OFF;"
+' - Multiple: "SET DATEFORMAT ymd; SET NOCOUNT ON; SET ANSI_WARNINGS OFF;"
+'
+' NOTE: prependSQL is optional - only use when session configuration is needed
+
+
+' ===================================
+' EXAMPLE 8: BATCH SIZE OPTIMIZATION
 ' ===================================
 ' Testing optimal batch sizes for your workload
 
@@ -412,14 +477,14 @@ Return DB.Global.ProcessActionLink(
 
 
 ' ===================================
-' EXAMPLE 8: BATCH ERROR RECOVERY PATTERN
+' EXAMPLE 9: BATCH ERROR RECOVERY PATTERN
 ' ===================================
 ' Handling batch failures gracefully
 
-Dim StringPayload8 = "" : Dim ParsedPayload8
-Dim PayloadError8 = DB.Global.ValidatePayloadAndToken(DB, False, "BatchWithRecovery", ParsedPayload8, StringPayload8)
-If PayloadError8 IsNot Nothing Then
-    Return PayloadError8
+Dim StringPayload9 = "" : Dim ParsedPayload9
+Dim PayloadError9 = DB.Global.ValidatePayloadAndToken(DB, False, "BatchWithRecovery", ParsedPayload9, StringPayload9)
+If PayloadError9 IsNot Nothing Then
+    Return PayloadError9
 End If
 
 Dim recoveryMappings = DB.Global.CreateFieldMappingsDictionary(
@@ -433,8 +498,8 @@ Dim recoveryMappings = DB.Global.CreateFieldMappingsDictionary(
 Dim recoveryBatchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
     "Products",
     recoveryMappings,
-    Nothing,
-    True
+    True,
+    Nothing
 )
 
 Dim result = DB.Global.ProcessActionLink(
@@ -442,7 +507,7 @@ Dim result = DB.Global.ProcessActionLink(
     DB.Global.CreateValidatorForBatch(New System.String() {"Records"}),
     recoveryBatchLogic,
     "Batch operation completed",
-    ParsedPayload8, StringPayload8, False
+    ParsedPayload9, StringPayload9, False
 )
 
 ' Parse result to check for errors
@@ -452,7 +517,7 @@ Dim errorCount As System.Int32 = If(resultObj("Errors") IsNot Nothing, resultObj
 If errorCount > 0 Then
     ' Log failed records for retry
     Dim errorDetails = resultObj("ErrorDetails")
-    DB.Global.LogCustom(DB, StringPayload8, errorDetails.ToSystem.String(),
+    DB.Global.LogCustom(DB, StringPayload9, errorDetails.ToSystem.String(),
         $"Batch operation had {errorCount} errors - review and retry failed records")
 
     ' You could:

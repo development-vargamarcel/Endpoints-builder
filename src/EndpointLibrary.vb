@@ -450,7 +450,8 @@ Private Shared Function BulkExistenceCheck(
     database As System.Object,
     tableName As System.String,
     keyFields As System.System.String(),
-    recordParameters As System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of System.String, System.Object))
+    recordParameters As System.Collections.Generic.List(Of System.Collections.Generic.Dictionary(Of System.String, System.Object)),
+    Optional prependSQL As System.String = Nothing
 ) As System.Collections.Generic.HashSet(Of String)
 
     If recordParameters Is Nothing OrElse recordParameters.Count = 0 Then
@@ -506,7 +507,12 @@ Private Shared Function BulkExistenceCheck(
         Dim checkQuery As New QWTable()
         Try
             checkQuery.Database = database
-            checkQuery.SQL = sqlBuilder.ToSystem.String()
+            ' Build query SQL and optionally prepend SQL (e.g., SET DATEFORMAT ymd;)
+            Dim bulkCheckSQL As System.String = sqlBuilder.ToSystem.String()
+            If Not System.String.IsNullOrEmpty(prependSQL) Then
+                bulkCheckSQL = prependSQL & " " & bulkCheckSQL
+            End If
+            checkQuery.SQL = bulkCheckSQL
 
             For Each param As System.Collections.Generic.KeyValuePair(Of System.String, System.Object) In queryParams
                 checkQuery.params(param.Key) = param.Value
@@ -581,12 +587,14 @@ Public Class BusinessLogicBatchWriterWrapper
     Private ReadOnly _fieldMappings As System.Collections.Generic.Dictionary(Of System.String, FieldMapping)
     Private ReadOnly _keyFields As System.System.String()
     Private ReadOnly _allowUpdates As System.Boolean
+    Private ReadOnly _prependSQL As System.String
 
-    Public Sub New(tableName As System.String, fieldMappings As System.Collections.Generic.Dictionary(Of System.String, FieldMapping), allowUpdates As System.Boolean)
+    Public Sub New(tableName As System.String, fieldMappings As System.Collections.Generic.Dictionary(Of System.String, FieldMapping), allowUpdates As System.Boolean, Optional prependSQL As System.String = Nothing)
         ' SECURITY: Validate table name
         _tableName = ValidateAndGetSqlIdentifier(tableName, "table name")
         _fieldMappings = fieldMappings
         _allowUpdates = allowUpdates
+        _prependSQL = prependSQL
 
         ' SECURITY: Validate all SQL column names in field mappings
         If fieldMappings IsNot Nothing Then
@@ -702,7 +710,7 @@ Public Class BusinessLogicBatchWriterWrapper
             ' PERFORMANCE: Single bulk existence check for all valid records
             Dim existingRecords As System.Collections.Generic.HashSet(Of String) = Nothing
             If allRecordParams.Count > 0 Then
-                existingRecords = BulkExistenceCheck(database, _tableName, _keyFields, allRecordParams)
+                existingRecords = BulkExistenceCheck(database, _tableName, _keyFields, allRecordParams, _prependSQL)
             Else
                 existingRecords = New System.Collections.Generic.HashSet(Of String)()
             End If
@@ -749,8 +757,12 @@ Public Class BusinessLogicBatchWriterWrapper
                             Dim updateQuery As New QWTable()
                             Try
                                 updateQuery.Database = database
-                                ' Removed hardcoded SET DATEFORMAT - use ISO 8601 format (yyyy-MM-dd) for dates in your data instead
-                                updateQuery.SQL = $"UPDATE {_tableName} SET {System.String.Join(", ", setClauses)} WHERE {System.String.Join(" AND ", whereConditions)}"
+                                ' Build UPDATE SQL and optionally prepend SQL (e.g., SET DATEFORMAT ymd;)
+                                Dim updateSQL As System.String = $"UPDATE {_tableName} SET {System.String.Join(", ", setClauses)} WHERE {System.String.Join(" AND ", whereConditions)}"
+                                If Not System.String.IsNullOrEmpty(_prependSQL) Then
+                                    updateSQL = _prependSQL & " " & updateSQL
+                                End If
+                                updateQuery.SQL = updateSQL
 
                                 For Each param As System.Collections.Generic.KeyValuePair(Of System.String, System.Object) In recordParams
                                     updateQuery.params(param.Key) = param.Value
@@ -779,7 +791,12 @@ Public Class BusinessLogicBatchWriterWrapper
                         Dim insertTable As New QWTable()
                         Try
                             insertTable.Database = database
-                            insertTable.SQL = $"SELECT * FROM {_tableName} WHERE 1=0"
+                            ' Build SELECT SQL for INSERT and optionally prepend SQL (e.g., SET DATEFORMAT ymd;)
+                            Dim insertSQL As System.String = $"SELECT * FROM {_tableName} WHERE 1=0"
+                            If Not System.String.IsNullOrEmpty(_prependSQL) Then
+                                insertSQL = _prependSQL & " " & insertSQL
+                            End If
+                            insertTable.SQL = insertSQL
                             insertTable.RequestLive = True
                             insertTable.AllowAllRecords = False
                             insertTable.Active = True
@@ -1378,9 +1395,10 @@ End Function
 Public Function CreateBusinessLogicForBatchWriting(
     tableName As System.String,
     fieldMappings As System.Collections.Generic.Dictionary(Of System.String, FieldMapping),
-    Optional allowUpdates As System.Boolean = True
+    Optional allowUpdates As System.Boolean = True,
+    Optional prependSQL As System.String = Nothing
 ) As Func(Of Object, Newtonsoft.Json.Linq.JObject, System.Object)
-    Return AddressOf New BusinessLogicBatchWriterWrapper(tableName, fieldMappings, allowUpdates).Execute
+    Return AddressOf New BusinessLogicBatchWriterWrapper(tableName, fieldMappings, allowUpdates, prependSQL).Execute
 End Function
 
 Public Shared Function ValidatePayloadAndToken(DB As System.Object, _

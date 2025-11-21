@@ -232,11 +232,12 @@ Select Case operation.ToLower()
         )
 
         ' Create batch logic - automatically extracts PK from mappings
+        ' Use prependSQL for date format consistency and performance optimization
         Dim batchLogic = DB.Global.CreateBusinessLogicForBatchWriting(
             "Orders",
             batchMappings,
-            Nothing,  ' Extract PK from mappings
-            True      ' Allow updates
+            True,      ' Allow updates
+            "SET DATEFORMAT ymd; SET NOCOUNT ON;"  ' Configure SQL session for batch operations
         )
 
         ' Validate batch payload structure
